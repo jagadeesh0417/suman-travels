@@ -81,6 +81,9 @@ export async function POST(request: Request) {
       for (const p of passengers) {
         insertPassenger.run(bookingId, p.name, p.mobile, p.gender);
       }
+
+      db.prepare('UPDATE slots SET available = available - ? WHERE id = ?').run(passengers.length, slot_id);
+      db.prepare("UPDATE slots SET enabled = CASE WHEN available <= 0 THEN 0 ELSE enabled END WHERE id = ?").run(slot_id);
     });
 
     transaction();

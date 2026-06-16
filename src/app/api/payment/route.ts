@@ -35,14 +35,6 @@ export async function POST(request: Request) {
       "UPDATE bookings SET payment_status = 'confirmed', payment_id = ?, utr_number = ? WHERE booking_id = ?"
     ).run(paymentId, utr_number || '', booking_id);
 
-    db.prepare(
-      'UPDATE slots SET available = available - ? WHERE id = ?'
-    ).run(booking.passenger_count, booking.slot_id);
-
-    db.prepare(
-      "UPDATE slots SET enabled = CASE WHEN available <= 0 THEN 0 ELSE enabled END WHERE id = ?"
-    ).run(booking.slot_id);
-
     const passengers = db
       .prepare('SELECT * FROM passengers WHERE booking_id = ?')
       .all(booking_id) as any[];

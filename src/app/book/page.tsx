@@ -650,6 +650,7 @@ export default function BookPage() {
   const [selectedDateStr, setSelectedDateStr] = useState('');
   const [selectedTimeStr, setSelectedTimeStr] = useState('');
   const [ticketCount, setTicketCount] = useState(1);
+  const [maxTickets, setMaxTickets] = useState(1);
   const [passengers, setPassengers] = useState<PassengerForm[]>([]);
   const [processing, setProcessing] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
@@ -688,7 +689,11 @@ export default function BookPage() {
     const slotsRes = await fetch(`/api/slots?date_id=${dateId}`);
     const slots = await slotsRes.json();
     const slotObj = slots.find((s: any) => s.id === slotId);
-    if (slotObj) setSelectedTimeStr(slotObj.time);
+    if (slotObj) {
+      setSelectedTimeStr(slotObj.time);
+      setMaxTickets(slotObj.available);
+      setTicketCount(1);
+    }
 
     setStep(1);
   };
@@ -818,11 +823,15 @@ export default function BookPage() {
                   </div>
                   <button
                     onClick={() => setTicketCount(ticketCount + 1)}
-                    className="w-12 h-12 rounded-xl border-2 border-gray-200 flex items-center justify-center text-xl font-bold text-gray-600 hover:border-[#1e3a5f] transition-colors"
+                    disabled={ticketCount >= maxTickets}
+                    className="w-12 h-12 rounded-xl border-2 border-gray-200 flex items-center justify-center text-xl font-bold text-gray-600 hover:border-[#1e3a5f] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     +
                   </button>
                 </div>
+                <p className="text-center text-sm text-gray-400">
+                  {maxTickets} seat{maxTickets > 1 ? 's' : ''} available
+                </p>
               </div>
               <div className="flex gap-3">
                 <button
