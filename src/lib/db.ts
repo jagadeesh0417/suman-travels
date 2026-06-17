@@ -5,17 +5,9 @@ const TURSO_URL = process.env.TURSO_DATABASE_URL || '';
 const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN || '';
 const isTurso = !!TURSO_URL;
 
-// Log env status on module load
-console.log('[DB] TURSO_DATABASE_URL:', TURSO_URL ? 'set' : 'NOT SET');
-console.log('[DB] TURSO_AUTH_TOKEN:', TURSO_TOKEN ? 'set' : 'NOT SET');
-
-// Convert libsql:// to https:// for HTTP transport (more reliable on serverless)
+// Convert libsql:// to https:// for HTTP-only transport (works on all serverless platforms)
 function normalizeUrl(url: string): string {
-  if (url.startsWith('libsql://')) {
-    const httpsUrl = 'https://' + url.slice(9);
-    console.log('[DB] Converted URL:', httpsUrl);
-    return httpsUrl;
-  }
+  if (url.startsWith('libsql://')) return 'https://' + url.slice(9);
   return url;
 }
 
@@ -29,16 +21,16 @@ function getDbUrl(): string {
   return `file:${dbPath}`;
 }
 
-// Dynamic import so module-level errors don't crash the server
+// On Vercel/Turso: use @libsql/client/web (pure fetch, no native deps).
+// Locally without Turso: use @libsql/client (supports file: protocol).
 async function createClientAsync() {
-  const mod = await import('@libsql/client');
   const url = getDbUrl();
-  console.log('[DB] Creating client with URL:', url.replace(/\/\/.*@/, '//***@'));
-  const client = mod.createClient({
-    url,
-    authToken: isTurso ? TURSO_TOKEN : undefined,
-  });
-  return client;
+  if (isTurso) {
+    const mod = await import('@libsql/client/web');
+    return mod.createClient({ url, authToken: TURSO_TOKEN });
+  }
+  const mod = await import('@libsql/client');
+  return mod.createClient({ url });
 }
 
 type Client = Awaited<ReturnType<typeof createClientAsync>>;
