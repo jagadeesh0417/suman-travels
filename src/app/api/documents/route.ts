@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbExecute, rowsToObjects } from '@/lib/db';
+import { dbExecute, rowsToObjects, rowToObject } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
-import fs from 'fs';
-import { getDocumentPath } from '@/lib/document';
+import { generateBookingDocument } from '@/lib/document';
 
 export async function GET(request: NextRequest) {
   const email = await getAdminSession();
@@ -13,13 +12,36 @@ export async function GET(request: NextRequest) {
     const download = searchParams.get('download');
 
     if (download) {
-      const docPath = getDocumentPath(download);
-      if (!fs.existsSync(docPath)) {
-        return NextResponse.json({ error: 'Document not found' }, { status: 404 });
+      const bookingResult = await dbExecute(
+        `SELECT b.booking_id, b.passenger_count, b.payment_status, b.amount, b.created_at, d.date, s.time
+         FROM bookings b
+         JOIN dates d ON b.date_id = d.id
+         JOIN slots s ON b.slot_id = s.id
+         WHERE b.booking_id = ?`,
+        [download]
+      );
+      const booking = rowToObject(bookingResult);
+      if (!booking) {
+        return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
       }
 
-      const buffer = fs.readFileSync(docPath);
-      return new NextResponse(buffer, {
+      const passengersResult = await dbExecute(
+        'SELECT name, mobile, gender FROM passengers WHERE booking_id = ? ORDER BY id',
+        [download]
+      );
+      const passengers = rowsToObjects(passengersResult) as { name: string; mobile: string; gender: string }[];
+
+      const buf = await generateBookingDocument({
+        bookingId: download,
+        paymentStatus: booking.payment_status as string,
+        date: booking.date as string,
+        time: booking.time as string,
+        passengerCount: Number(booking.passenger_count),
+        amount: Number(booking.amount),
+        passengers,
+      });
+
+      return new NextResponse(new Uint8Array(buf), {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           'Content-Disposition': `attachment; filename="${download}.docx"`,
@@ -45,7 +67,7 @@ export async function GET(request: NextRequest) {
       amount: b.amount,
       payment_status: b.payment_status,
       created_at: b.created_at,
-      has_document: fs.existsSync(getDocumentPath(b.booking_id as string)),
+      has_document: true,
     }));
 
     return NextResponse.json(documents);

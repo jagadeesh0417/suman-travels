@@ -360,7 +360,10 @@ export async function generateBookingDocument(
 }
 
 export function getDocumentDir(): string {
-  const dir = path.join(process.cwd(), 'data', 'documents');
+  const isVercel = process.env.VERCEL === '1';
+  const dir = isVercel
+    ? path.join('/tmp', 'documents')
+    : path.join(process.cwd(), 'data', 'documents');
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
