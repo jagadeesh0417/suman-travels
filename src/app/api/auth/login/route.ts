@@ -3,6 +3,7 @@ import { dbExecute, rowToObject } from '@/lib/db';
 import { verifyPassword, createAdminSession } from '@/lib/auth';
 
 export async function POST(request: Request) {
+  let debug: any = {};
   try {
     const { email, password } = await request.json();
 
@@ -17,9 +18,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    console.log('[LOGIN] admin obj:', JSON.stringify(admin));
-    console.log('[LOGIN] adminResult columns:', JSON.stringify(adminResult?.columns));
-    console.log('[LOGIN] adminResult.rows[0]:', JSON.stringify(adminResult?.rows?.[0]));
+    debug = {
+      adminKeys: Object.keys(admin),
+      columns: adminResult?.columns,
+      row0: adminResult?.rows?.[0],
+      hasPasswordHash: 'password_hash' in admin,
+      passwordHashType: typeof admin.password_hash,
+      passwordHashValue: admin.password_hash ? 'EXISTS' : 'UNDEFINED/NULL',
+    };
 
     const valid = await verifyPassword(password, admin.password_hash as string);
     if (!valid) {
@@ -31,6 +37,6 @@ export async function POST(request: Request) {
   } catch (err: any) {
     console.error('[API /auth/login] POST error:', err?.message || err);
     const msg = err?.message || String(err || 'Unknown error');
-    return NextResponse.json({ error: 'Login failed', detail: msg }, { status: 500 });
+    return NextResponse.json({ error: 'Login failed', detail: msg, debug }, { status: 500 });
   }
 }
