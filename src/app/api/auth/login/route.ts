@@ -12,9 +12,14 @@ export async function POST(request: Request) {
 
     const adminResult = await dbExecute('SELECT * FROM admin WHERE email = ?', [email]);
     const admin = rowToObject(adminResult);
+
     if (!admin) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
+
+    console.log('[LOGIN] admin obj:', JSON.stringify(admin));
+    console.log('[LOGIN] adminResult columns:', JSON.stringify(adminResult?.columns));
+    console.log('[LOGIN] adminResult.rows[0]:', JSON.stringify(adminResult?.rows?.[0]));
 
     const valid = await verifyPassword(password, admin.password_hash as string);
     if (!valid) {
