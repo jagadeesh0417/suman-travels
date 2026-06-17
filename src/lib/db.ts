@@ -92,8 +92,9 @@ class DirectTursoClient {
     const r = first.response?.result;
     if (!r) throw new Error('Unexpected Turso response');
 
-    const columns = r.columns;
-    const rows = r.rows.map((row: unknown[]) => {
+    const columns = r.columns || [];
+    const rawRows = r.rows || [];
+    const rows = rawRows.map((row: unknown[]) => {
       const obj: Record<string, unknown> = {};
       for (let i = 0; i < columns.length; i++) obj[columns[i]] = row[i];
       return obj;
