@@ -23,16 +23,28 @@ function getDbUrl(): string {
 // ---------------------------------------------------------------------------
 // Direct Turso HTTP client (hrana v2 over HTTP via raw fetch)
 // ---------------------------------------------------------------------------
-interface TursoStmt {
-  sql: string;
-  args: (string | number)[];
-  named_args: string[];
-  want_rows: boolean;
+
+function toHranaValue(v: string | number | null | undefined): Record<string, unknown> {
+  if (v === null || v === undefined) return { type: 'null' };
+  if (typeof v === 'number') {
+    if (Number.isInteger(v)) return { type: 'integer', value: String(v) };
+    return { type: 'float', value: v };
+  }
+  return { type: 'text', value: v };
+}
+
+function encodeArgs(args?: (string | number)[]): Record<string, unknown>[] {
+  return (args || []).map(toHranaValue);
 }
 
 interface TursoRequest {
   type: 'execute' | 'close';
-  stmt?: TursoStmt;
+  stmt?: {
+    sql: string;
+    args: Record<string, unknown>[];
+    named_args: string[];
+    want_rows: boolean;
+  };
 }
 
 interface TursoResponse {
@@ -69,7 +81,7 @@ class DirectTursoClient {
 
   async execute({ sql, args }: { sql: string; args?: (string | number)[] }): Promise<ResultSet> {
     const resp = await this._pipeline([
-      { type: 'execute', stmt: { sql, args: args || [], named_args: [], want_rows: true } },
+      { type: 'execute', stmt: { sql, args: encodeArgs(args), named_args: [], want_rows: true } },
       { type: 'close' },
     ]);
 
@@ -143,7 +155,7 @@ class DirectTursoTransaction {
     }
 
     const resp = await this.client._pipeline([
-      { type: 'execute', stmt: { sql, args: args || [], named_args: [], want_rows: true } },
+      { type: 'execute', stmt: { sql, args: encodeArgs(args), named_args: [], want_rows: true } },
     ], this.baton);
     this.baton = resp.baton;
 
