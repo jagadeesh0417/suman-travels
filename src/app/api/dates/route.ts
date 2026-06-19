@@ -28,7 +28,10 @@ export async function POST(request: Request) {
 
     const timings = ['07:30', '10:30', '13:00', '15:30'];
     for (const time of timings) {
-      await dbExecute('INSERT OR IGNORE INTO slots (date_id, time, enabled, vehicle_time) VALUES (?, ?, 1, ?)', [dateId, time, '']);
+      const existing = await dbExecute('SELECT id FROM slots WHERE date_id = ? AND time = ?', [dateId, time]);
+      if (existing.rows.length === 0) {
+        await dbExecute('INSERT INTO slots (date_id, time, enabled, vehicle_time) VALUES (?, ?, 1, ?)', [dateId, time, '']);
+      }
     }
 
     return NextResponse.json({ id: dateId, date }, { status: 201 });

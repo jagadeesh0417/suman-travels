@@ -15,6 +15,7 @@ interface SlotRecord {
 export default function AdminSlots() {
   const [slots, setSlots] = useState<SlotRecord[]>([]);
   const [vehicleTimes, setVehicleTimes] = useState<Record<number, string>>({});
+  const [generating, setGenerating] = useState(false);
 
   const loadData = useCallback(() => {
     fetch('/api/slots')
@@ -66,7 +67,22 @@ export default function AdminSlots() {
         Set the vehicle start time for each slot.
       </p>
 
-      {sorted.length === 0 && (
+      <button
+        onClick={async () => {
+          setGenerating(true);
+          try {
+            await fetch('/api/slots/generate-missing', { method: 'POST' });
+            loadData();
+          } catch {}
+          setGenerating(false);
+        }}
+        disabled={generating}
+        className="btn-primary mb-6"
+      >
+        {generating ? 'Generating...' : 'Generate Missing Slots for All Dates'}
+      </button>
+
+      {sorted.length === 0 && !generating && (
         <div className="glass-card p-12 text-center">
           <p className="text-gray-500">No dates created yet. Add a date from the Dates page to auto-create slots.</p>
         </div>
