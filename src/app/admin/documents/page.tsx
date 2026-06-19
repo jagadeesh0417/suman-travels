@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { slotLabel } from '@/lib/slots';
 
 interface DocumentRecord {
   booking_id: string;
@@ -78,7 +79,7 @@ export default function AdminDocuments() {
                       day: 'numeric',
                     })}
                   </td>
-                  <td className="p-4 text-gray-900">{doc.time}</td>
+                  <td className="p-4 text-gray-900">{slotLabel(doc.time)}</td>
                   <td className="p-4 text-center font-medium">{doc.passenger_count}</td>
                   <td className="p-4 text-right font-medium">
                     ₹{doc.amount.toLocaleString('en-IN')}

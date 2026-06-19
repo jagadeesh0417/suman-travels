@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
+import { slotLabel } from '@/lib/slots';
 
 interface Passenger {
   name: string;
@@ -84,7 +85,7 @@ export default function BookingDetailPage({
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Time</span>
-              <span className="font-medium">{booking.time}</span>
+              <span className="font-medium">{slotLabel(booking.time)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Passengers</span>

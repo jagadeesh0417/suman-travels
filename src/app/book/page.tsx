@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
 
+import { slotLabel } from '@/lib/slots';
+
 interface DateOption {
   id: number;
   date: string;
@@ -177,8 +179,11 @@ function StepSelectSlot({
                       : 'border-gray-100 hover:border-gray-200 bg-white'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-bold text-gray-900">{s.time}</span>
+                  <div className="mb-1">
+                    <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Slot</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-gray-900">{slotLabel(s.time)}</span>
                   </div>
                 </button>
               ))}
@@ -394,7 +399,7 @@ function StepSummary({
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Time</span>
-            <span className="font-semibold">{selectedTime}</span>
+            <span className="font-semibold">{slotLabel(selectedTime)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Passengers</span>
@@ -821,7 +826,7 @@ export default function BookPage() {
                 Number of Tickets
               </h2>
               <p className="text-gray-500 mb-6">
-                Selected: {selectedDateStr} at {selectedTimeStr}
+                Selected: {selectedDateStr} at {slotLabel(selectedTimeStr)}
               </p>
               <div className="max-w-xs mx-auto">
                 <div className="flex items-center gap-4 mb-6">

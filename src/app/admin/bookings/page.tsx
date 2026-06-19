@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { slotLabel } from '@/lib/slots';
 
 interface BookingRecord {
   booking_id: string;
@@ -92,7 +93,7 @@ export default function AdminBookings() {
                       day: 'numeric',
                     })}
                   </td>
-                  <td className="p-4 text-gray-900">{b.time}</td>
+                  <td className="p-4 text-gray-900">{slotLabel(b.time)}</td>
                   <td className="p-4 text-center font-medium">{b.passenger_count}</td>
                   <td className="p-4 text-right font-medium">
                     ₹{b.amount.toLocaleString('en-IN')}

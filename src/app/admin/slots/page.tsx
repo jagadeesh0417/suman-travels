@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { EXAM_TIMINGS, slotLabel } from '@/lib/slots';
 
 interface DateRecord {
   id: number;
@@ -117,14 +118,18 @@ export default function AdminSlots() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
-            <input
-              type="time"
+            <label className="block text-sm font-medium text-gray-700 mb-1">Time (Exam Timing)</label>
+            <select
               value={newTime}
               onChange={(e) => setNewTime(e.target.value)}
-              className="input-field"
+              className="select-field"
               required
-            />
+            >
+              <option value="">Select exam timing</option>
+              {EXAM_TIMINGS.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
           </div>
         </div>
         <button type="submit" className="btn-primary mt-4">
@@ -167,14 +172,17 @@ export default function AdminSlots() {
                   </td>
                   <td className="p-4">
                     {editId === s.id ? (
-                      <input
-                        type="time"
+                      <select
                         value={editTime}
                         onChange={(e) => setEditTime(e.target.value)}
-                        className="input-field"
-                      />
+                        className="select-field"
+                      >
+                        {EXAM_TIMINGS.map((t) => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                      </select>
                     ) : (
-                      <span className="font-medium text-gray-900">{s.time}</span>
+                      <span className="font-medium text-gray-900">{slotLabel(s.time)}</span>
                     )}
                   </td>
                   <td className="p-4 text-center">

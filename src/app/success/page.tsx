@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
+import { slotLabel } from '@/lib/slots';
 
 interface BookingData {
   booking_id: string;
@@ -129,7 +130,7 @@ export default function SuccessPage({
             </div>
             <div className="flex justify-between items-center py-2 border-b border-gray-50">
               <span className="text-gray-500">Travel Time</span>
-              <span className="font-semibold">{booking.time}</span>
+              <span className="font-semibold">{slotLabel(booking.time)}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-gray-50">
               <span className="text-gray-500">Tickets</span>
