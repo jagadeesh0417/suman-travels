@@ -131,7 +131,7 @@ export default function AdminSlots() {
                         />
                         <button
                           onClick={() => handleVehicleTimeSave(slot.id)}
-                          className="px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors"
+                          className="px-3 py-1.5 bg-[#1e3a5f] text-white rounded-lg text-xs font-semibold hover:bg-[#2a4f7f] transition-colors shadow-sm"
                         >
                           Save
                         </button>
