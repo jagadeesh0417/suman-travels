@@ -82,6 +82,9 @@ export default function AdminDates() {
             Add Date
           </button>
         </div>
+        <p className="text-xs text-gray-400 mt-2">
+          4 exam slots (07:30 AM, 10:30 AM, 01:00 PM, 03:30 PM) will be auto-created for this date.
+        </p>
       </form>
 
       <div className="glass-card overflow-hidden">

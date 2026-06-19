@@ -310,6 +310,7 @@ async function ensureSchema(): Promise<void> {
       value TEXT NOT NULL,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_slots_date_id_time ON slots(date_id, time)',
     'CREATE INDEX IF NOT EXISTS idx_slots_date_id ON slots(date_id)',
     'CREATE INDEX IF NOT EXISTS idx_bookings_booking_id ON bookings(booking_id)',
     'CREATE INDEX IF NOT EXISTS idx_passengers_booking_id ON passengers(booking_id)',
@@ -326,6 +327,10 @@ async function ensureSchema(): Promise<void> {
 
   try {
     await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN utr_number TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE slots ADD COLUMN vehicle_time TEXT DEFAULT ''" });
   } catch {
   }
 

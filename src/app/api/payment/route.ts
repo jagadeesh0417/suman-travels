@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     }
 
     const bookingResult = await dbExecute(
-      `SELECT b.*, d.date, s.time
+      `SELECT b.*, d.date, s.time, s.vehicle_time
        FROM bookings b
        JOIN dates d ON b.date_id = d.id
        JOIN slots s ON b.slot_id = s.id
@@ -49,6 +49,7 @@ export async function POST(request: Request) {
         paymentStatus: 'confirmed',
         date: booking.date as string,
         time: booking.time as string,
+        vehicleTime: (booking.vehicle_time as string) || undefined,
         passengerCount: booking.passenger_count as number,
         amount: booking.amount as number,
         passengers: passengers.map((p) => ({

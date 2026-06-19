@@ -16,6 +16,7 @@ interface SlotOption {
   date_id: number;
   time: string;
   enabled: number;
+  vehicle_time: string;
 }
 
 interface PassengerForm {
@@ -185,6 +186,11 @@ function StepSelectSlot({
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-gray-900">{slotLabel(s.time)}</span>
                   </div>
+                  {s.vehicle_time && (
+                    <div className="mt-2 text-xs text-orange-600 font-medium">
+                      Vehicle @ {s.vehicle_time}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
@@ -366,6 +372,7 @@ function StepPassengerDetails({
 function StepSummary({
   selectedDate,
   selectedTime,
+  selectedVehicleTime,
   passengers,
   pricePerTicket,
   onBack,
@@ -373,6 +380,7 @@ function StepSummary({
 }: {
   selectedDate: string;
   selectedTime: string;
+  selectedVehicleTime: string;
   passengers: PassengerForm[];
   pricePerTicket: number;
   onBack: () => void;
@@ -398,9 +406,15 @@ function StepSummary({
             <span className="font-semibold">{selectedDate}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">Time</span>
+            <span className="text-gray-500">Exam Time</span>
             <span className="font-semibold">{slotLabel(selectedTime)}</span>
           </div>
+          {selectedVehicleTime && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">Vehicle</span>
+              <span className="font-semibold text-orange-600">{selectedVehicleTime}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-gray-500">Passengers</span>
             <span className="font-semibold">{passengers.length}</span>
@@ -646,6 +660,7 @@ export default function BookPage() {
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
   const [selectedDateStr, setSelectedDateStr] = useState('');
   const [selectedTimeStr, setSelectedTimeStr] = useState('');
+  const [selectedVehicleTimeStr, setSelectedVehicleTimeStr] = useState('');
   const [ticketCount, setTicketCount] = useState(1);
   const maxTickets = 100;
   const [passengers, setPassengers] = useState<PassengerForm[]>([]);
@@ -693,6 +708,7 @@ export default function BookPage() {
     const slotObj = slots.find((s: any) => s.id === slotId);
     if (slotObj) {
       setSelectedTimeStr(slotObj.time);
+      setSelectedVehicleTimeStr(slotObj.vehicle_time || '');
       setTicketCount(1);
     }
 
@@ -882,6 +898,7 @@ export default function BookPage() {
             <StepSummary
               selectedDate={selectedDateStr}
               selectedTime={selectedTimeStr}
+              selectedVehicleTime={selectedVehicleTimeStr}
               passengers={passengers}
               pricePerTicket={pricePerTicket}
               onBack={() => setStep(2)}

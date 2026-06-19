@@ -1,243 +1,144 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { EXAM_TIMINGS, slotLabel } from '@/lib/slots';
-
-interface DateRecord {
-  id: number;
-  date: string;
-}
+import { useEffect, useState, useCallback } from 'react';
+import { EXAM_TIMINGS } from '@/lib/slots';
 
 interface SlotRecord {
   id: number;
   date_id: number;
   time: string;
   enabled: number;
+  vehicle_time: string;
   date?: string;
 }
 
 export default function AdminSlots() {
   const [slots, setSlots] = useState<SlotRecord[]>([]);
-  const [dates, setDates] = useState<DateRecord[]>([]);
-  const [selectedDateId, setSelectedDateId] = useState('');
-  const [newTime, setNewTime] = useState('');
-  const [editId, setEditId] = useState<number | null>(null);
-  const [editTime, setEditTime] = useState('');
+  const [vehicleTimes, setVehicleTimes] = useState<Record<number, string>>({});
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     fetch('/api/slots')
       .then((r) => r.json())
-      .then(setSlots);
-    fetch('/api/dates')
-      .then((r) => r.json())
-      .then(setDates);
-  };
+      .then((data: SlotRecord[]) => {
+        setSlots(data);
+        const map: Record<number, string> = {};
+        data.forEach((s) => { map[s.id] = s.vehicle_time || ''; });
+        setVehicleTimes(map);
+      });
+  }, []);
 
-  useEffect(loadData, []);
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedDateId || !newTime) return;
-
-    const res = await fetch('/api/slots', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        date_id: Number(selectedDateId),
-        time: newTime,
-      }),
-    });
-
-    if (res.ok) {
-      setNewTime('');
-      loadData();
-    } else {
-      const err = await res.json();
-      alert(err.error || 'Failed to create slot');
-    }
-  };
-
-  const handleUpdate = async (id: number) => {
-    const res = await fetch('/api/slots', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id,
-        time: editTime,
-      }),
-    });
-
-    if (res.ok) {
-      setEditId(null);
-      loadData();
-    }
-  };
+  useEffect(loadData, [loadData]);
 
   const handleToggle = async (id: number, current: number) => {
-    const res = await fetch('/api/slots', {
+    await fetch('/api/slots', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, enabled: current ? 0 : 1 }),
     });
-
-    if (res.ok) loadData();
+    loadData();
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Delete this slot?')) return;
-    const res = await fetch(`/api/slots?id=${id}`, { method: 'DELETE' });
-    if (res.ok) loadData();
+  const handleVehicleTimeSave = async (id: number) => {
+    await fetch('/api/slots', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, vehicle_time: vehicleTimes[id] || '' }),
+    });
+    loadData();
   };
+
+  const grouped = slots.reduce((acc, s) => {
+    const key = s.date || String(s.date_id);
+    if (!acc[key]) acc[key] = { date: s.date, date_id: s.date_id, slots: [] };
+    acc[key].slots.push(s);
+    return acc;
+  }, {} as Record<string, { date?: string; date_id: number; slots: SlotRecord[] }>);
+
+  const sorted = Object.values(grouped).sort((a, b) =>
+    (a.date || '').localeCompare(b.date || '')
+  );
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-[#1e3a5f] mb-6">Manage Slots</h1>
+      <h1 className="text-2xl font-bold text-[#1e3a5f] mb-2">Exam Slots</h1>
+      <p className="text-gray-500 mb-6">
+        Fixed exam timings — slots are automatically created when you add a date.
+        Set the vehicle start time for each slot.
+      </p>
 
-      <form onSubmit={handleCreate} className="glass-card p-6 mb-6">
-        <h2 className="font-bold text-gray-900 mb-4">Create New Slot</h2>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-            <select
-              value={selectedDateId}
-              onChange={(e) => setSelectedDateId(e.target.value)}
-              className="select-field"
-              required
-            >
-              <option value="">Select date</option>
-              {dates.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {new Date(d.date).toLocaleDateString('en-IN', {
+      {sorted.length === 0 && (
+        <div className="glass-card p-12 text-center">
+          <p className="text-gray-500">No dates created yet. Add a date from the Dates page to auto-create slots.</p>
+        </div>
+      )}
+
+      {sorted.map((group) => (
+        <div key={group.date_id} className="glass-card mb-4 overflow-hidden">
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
+            <h2 className="font-bold text-[#1e3a5f]">
+              {group.date
+                ? new Date(group.date).toLocaleDateString('en-IN', {
                     weekday: 'short',
                     year: 'numeric',
                     month: 'short',
                     day: 'numeric',
-                  })}
-                </option>
-              ))}
-            </select>
+                  })
+                : `Date #${group.date_id}`}
+            </h2>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Time (Exam Timing)</label>
-            <select
-              value={newTime}
-              onChange={(e) => setNewTime(e.target.value)}
-              className="select-field"
-              required
-            >
-              <option value="">Select exam timing</option>
-              {EXAM_TIMINGS.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <button type="submit" className="btn-primary mt-4">
-          Create Slot
-        </button>
-      </form>
-
-      <div className="glass-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="text-left p-4 text-sm font-semibold text-gray-700">Date</th>
-                <th className="text-left p-4 text-sm font-semibold text-gray-700">Time</th>
-                <th className="text-center p-4 text-sm font-semibold text-gray-700">Status</th>
-                <th className="text-right p-4 text-sm font-semibold text-gray-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {slots.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-gray-500">
-                    No slots created yet
-                  </td>
-                </tr>
-              )}
-              {slots.map((s) => (
-                <tr key={s.id} className="border-t border-gray-50 hover:bg-gray-50/50 transition-colors">
-                  <td className="p-4">
-                    <span className="text-gray-900">
-                      {s.date
-                        ? new Date(s.date).toLocaleDateString('en-IN', {
-                            weekday: 'short',
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          })
-                        : '-'}
+          <div className="p-4 space-y-2">
+            {EXAM_TIMINGS.map((timing) => {
+              const slot = group.slots.find((s) => s.time === timing.value);
+              return (
+                <div
+                  key={timing.value}
+                  className="flex items-center gap-4 py-3 px-4 rounded-lg hover:bg-gray-50 transition-colors flex-wrap"
+                >
+                  <div className="flex items-center gap-3 min-w-[180px]">
+                    <span className="text-sm font-medium text-gray-500 w-16">
+                      {timing.label.split(' – ')[0]}
                     </span>
-                  </td>
-                  <td className="p-4">
-                    {editId === s.id ? (
-                      <select
-                        value={editTime}
-                        onChange={(e) => setEditTime(e.target.value)}
-                        className="select-field"
+                    <span className="font-semibold text-gray-900">{timing.label.split(' – ')[1]}</span>
+                  </div>
+
+                  {slot && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-gray-500 whitespace-nowrap">Vehicle</label>
+                        <input
+                          type="time"
+                          value={vehicleTimes[slot.id] ?? ''}
+                          onChange={(e) =>
+                            setVehicleTimes((prev) => ({ ...prev, [slot.id]: e.target.value }))
+                          }
+                          className="input-field !py-1.5 !text-sm !w-32"
+                        />
+                        <button
+                          onClick={() => handleVehicleTimeSave(slot.id)}
+                          className="px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors"
+                        >
+                          Save
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => handleToggle(slot.id, slot.enabled)}
+                        className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ml-auto ${
+                          slot.enabled
+                            ? 'bg-green-50 text-green-600 hover:bg-green-100'
+                            : 'bg-red-50 text-red-600 hover:bg-red-100'
+                        }`}
                       >
-                        {EXAM_TIMINGS.map((t) => (
-                          <option key={t.value} value={t.value}>{t.label}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="font-medium text-gray-900">{slotLabel(s.time)}</span>
-                    )}
-                  </td>
-                  <td className="p-4 text-center">
-                    <button
-                      onClick={() => handleToggle(s.id, s.enabled)}
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        s.enabled
-                          ? 'bg-green-50 text-green-600'
-                          : 'bg-red-50 text-red-600'
-                      }`}
-                    >
-                      {s.enabled ? 'Enabled' : 'Disabled'}
-                    </button>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex justify-end gap-2">
-                      {editId === s.id ? (
-                        <>
-                          <button
-                            onClick={() => handleUpdate(s.id)}
-                            className="px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-sm font-medium hover:bg-green-100"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditId(null)}
-                            className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-100"
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => { setEditId(s.id); setEditTime(s.time); }}
-                            className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(s.id)}
-                            className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100"
-                          >
-                            Delete
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        {slot.enabled ? 'Enabled' : 'Disabled'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      ))}
     </div>
   );
 }

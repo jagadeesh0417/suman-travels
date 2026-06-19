@@ -24,7 +24,14 @@ export async function POST(request: Request) {
     if (existing.rows.length > 0) return NextResponse.json({ error: 'Date already exists' }, { status: 400 });
 
     const result = await dbExecute('INSERT INTO dates (date) VALUES (?)', [date]);
-    return NextResponse.json({ id: Number(result.lastInsertRowid), date }, { status: 201 });
+    const dateId = Number(result.lastInsertRowid);
+
+    const timings = ['07:30', '10:30', '13:00', '15:30'];
+    for (const time of timings) {
+      await dbExecute('INSERT OR IGNORE INTO slots (date_id, time, enabled, vehicle_time) VALUES (?, ?, 1, ?)', [dateId, time, '']);
+    }
+
+    return NextResponse.json({ id: dateId, date }, { status: 201 });
   } catch (err: any) {
     console.error('[API /dates] POST error:', err?.message || err);
     return NextResponse.json({ error: 'Failed to create date' }, { status: 500 });
@@ -56,6 +63,7 @@ export async function DELETE(request: Request) {
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
+    await dbExecute('DELETE FROM slots WHERE date_id = ?', [Number(id)]);
     await dbExecute('DELETE FROM dates WHERE id = ?', [Number(id)]);
     return NextResponse.json({ message: 'Date deleted' });
   } catch (err: any) {

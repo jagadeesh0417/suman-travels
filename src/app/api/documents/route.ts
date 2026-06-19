@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
     if (download) {
       const bookingResult = await dbExecute(
-        `SELECT b.booking_id, b.passenger_count, b.payment_status, b.amount, b.created_at, d.date, s.time
+        `SELECT b.booking_id, b.passenger_count, b.payment_status, b.amount, b.created_at, d.date, s.time, s.vehicle_time
          FROM bookings b
          JOIN dates d ON b.date_id = d.id
          JOIN slots s ON b.slot_id = s.id
@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
         paymentStatus: booking.payment_status as string,
         date: booking.date as string,
         time: booking.time as string,
+        vehicleTime: (booking.vehicle_time as string) || undefined,
         passengerCount: Number(booking.passenger_count),
         amount: Number(booking.amount),
         passengers,

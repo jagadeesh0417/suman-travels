@@ -34,6 +34,7 @@ interface BookingDocData {
   paymentStatus: string;
   date: string;
   time: string;
+  vehicleTime?: string;
   passengerCount: number;
   amount: number;
   passengers: PassengerDoc[];
@@ -247,11 +248,20 @@ export async function generateBookingDocument(
           }),
           new Paragraph({
             children: [
-              new TextRun({ text: `Travel Time: `, bold: true, size: 20 }),
+              new TextRun({ text: `Exam Time: `, bold: true, size: 20 }),
               new TextRun({ text: `${data.time}`, size: 20 }),
             ],
             spacing: { after: 60 },
           }),
+          ...(data.vehicleTime
+            ? [new Paragraph({
+                children: [
+                  new TextRun({ text: `Vehicle Start: `, bold: true, size: 20 }),
+                  new TextRun({ text: `${data.vehicleTime}`, size: 20, color: 'CC5500' }),
+                ],
+                spacing: { after: 60 },
+              })]
+            : []),
           new Paragraph({
             children: [
               new TextRun({ text: `Passenger Count: `, bold: true, size: 20 }),

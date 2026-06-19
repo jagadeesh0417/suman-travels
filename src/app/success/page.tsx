@@ -10,6 +10,7 @@ interface BookingData {
   payment_id: string;
   date: string;
   time: string;
+  vehicle_time?: string;
   passenger_count: number;
   amount: number;
   passengers: {
@@ -129,9 +130,15 @@ export default function SuccessPage({
               <span className="font-semibold">{booking.date}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-gray-50">
-              <span className="text-gray-500">Travel Time</span>
+              <span className="text-gray-500">Exam Time</span>
               <span className="font-semibold">{slotLabel(booking.time)}</span>
             </div>
+            {booking.vehicle_time && (
+              <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                <span className="text-gray-500">Vehicle</span>
+                <span className="font-semibold text-orange-600">{booking.vehicle_time}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center py-2 border-b border-gray-50">
               <span className="text-gray-500">Tickets</span>
               <span className="font-semibold">{booking.passenger_count}</span>

@@ -55,7 +55,7 @@ export async function PUT(request: Request) {
   if (!email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const { id, time, enabled } = await request.json();
+    const { id, time, enabled, vehicle_time } = await request.json();
     if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
     const updates: string[] = [];
@@ -63,6 +63,7 @@ export async function PUT(request: Request) {
 
     if (time !== undefined) { updates.push('time = ?'); values.push(time); }
     if (enabled !== undefined) { updates.push('enabled = ?'); values.push(enabled ? 1 : 0); }
+    if (vehicle_time !== undefined) { updates.push('vehicle_time = ?'); values.push(vehicle_time); }
 
     if (updates.length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 });

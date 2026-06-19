@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || '';
 
     let query = `
-      SELECT b.*, d.date, s.time
+      SELECT b.*, d.date, s.time, s.vehicle_time
       FROM bookings b
       JOIN dates d ON b.date_id = d.id
       JOIN slots s ON b.slot_id = s.id
