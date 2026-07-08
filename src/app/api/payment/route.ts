@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { dbExecute, rowsToObjects, rowToObject } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { generateBookingDocument, getDocumentPath } from '@/lib/document';
 
 export async function POST(request: Request) {
   try {
@@ -34,32 +33,6 @@ export async function POST(request: Request) {
     await dbExecute(
       "UPDATE bookings SET payment_status = 'confirmed', payment_id = ?, utr_number = ? WHERE booking_id = ?",
       [paymentId, utr_number || '', booking_id]
-    );
-
-    const passengersResult = await dbExecute(
-      'SELECT * FROM passengers WHERE booking_id = ?',
-      [booking_id]
-    );
-    const passengers = rowsToObjects(passengersResult) as { name: string; mobile: string; gender: string }[];
-
-    const docPath = getDocumentPath(booking_id);
-    await generateBookingDocument(
-      {
-        bookingId: booking_id,
-        paymentStatus: 'confirmed',
-        date: booking.date as string,
-        time: booking.time as string,
-        vehicleTime: (booking.vehicle_time as string) || undefined,
-        examCenter: (booking.exam_center as string) || undefined,
-        passengerCount: booking.passenger_count as number,
-        amount: booking.amount as number,
-        passengers: passengers.map((p) => ({
-          name: p.name,
-          mobile: p.mobile,
-          gender: p.gender,
-        })),
-      },
-      docPath
     );
 
     return NextResponse.json({

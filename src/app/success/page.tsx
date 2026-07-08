@@ -43,18 +43,23 @@ export default function SuccessPage({
   }, [id]);
 
   const handleDownload = async () => {
+    if (!booking) return;
     try {
-      const res = await fetch(`/api/documents?download=${id}`);
+      const res = await fetch(`/api/documents?download=${booking.date}`);
       if (!res.ok) throw new Error('Document not found');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
+      const dateObj = new Date(booking.date);
+      const dd = String(dateObj.getDate()).padStart(2, '0');
+      const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const yyyy = dateObj.getFullYear();
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${id}.docx`;
+      a.download = `${dd}-${mm}-${yyyy}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert('Document not available yet. Please try again shortly.');
+      alert('Report not available yet. Please try again shortly.');
     }
   };
 
@@ -189,7 +194,7 @@ export default function SuccessPage({
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            Download Receipt
+            Download Report
           </button>
           <Link href="/" className="btn-outline justify-center">
             Return Home

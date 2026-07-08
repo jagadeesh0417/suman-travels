@@ -1,111 +1,114 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { slotLabel } from '@/lib/slots';
 
-interface DocumentRecord {
-  booking_id: string;
+interface DateFile {
   date: string;
-  time: string;
-  passenger_count: number;
-  amount: number;
-  payment_status: string;
-  created_at: string;
-  has_document: boolean;
+  booking_count: number;
 }
 
 export default function AdminDocuments() {
-  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [files, setFiles] = useState<DateFile[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/documents')
       .then((r) => r.json())
-      .then(setDocuments);
+      .then((data) => {
+        setFiles(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, []);
 
-  const handleDownload = async (bookingId: string) => {
+  const handleDownload = async (date: string) => {
     try {
-      const res = await fetch(`/api/documents?download=${bookingId}`);
+      const res = await fetch(`/api/documents?download=${date}`);
       if (!res.ok) throw new Error('Document not found');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
+      const dateObj = new Date(date);
+      const dd = String(dateObj.getDate()).padStart(2, '0');
+      const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const yyyy = dateObj.getFullYear();
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${bookingId}.docx`;
+      a.download = `${dd}-${mm}-${yyyy}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert('Document not available');
+      alert('Failed to download. No confirmed bookings for this date.');
     }
   };
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-[#1e3a5f] mb-6">Documents</h1>
+      <h1 className="text-2xl font-bold text-[#1e3a5f] mb-2">Date-wise Reports</h1>
+      <p className="text-gray-500 mb-6">
+        One Excel file per travel date, grouped by Exam Center and Slot.
+      </p>
 
       <div className="glass-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="text-left p-4 text-sm font-semibold text-gray-700">Booking ID</th>
-                <th className="text-left p-4 text-sm font-semibold text-gray-700">Date</th>
-                <th className="text-left p-4 text-sm font-semibold text-gray-700">Time</th>
-                <th className="text-center p-4 text-sm font-semibold text-gray-700">Passengers</th>
-                <th className="text-right p-4 text-sm font-semibold text-gray-700">Amount</th>
-                <th className="text-center p-4 text-sm font-semibold text-gray-700">Status</th>
-                <th className="text-right p-4 text-sm font-semibold text-gray-700">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {documents.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-gray-500">
-                    No confirmed bookings yet. Documents appear after successful payment.
-                  </td>
-                </tr>
-              )}
-              {documents.map((doc) => (
-                <tr key={doc.booking_id} className="border-t border-gray-50 hover:bg-gray-50/50 transition-colors">
-                  <td className="p-4">
-                    <span className="font-mono font-medium text-[#1e3a5f] text-sm">
-                      {doc.booking_id}
-                    </span>
-                  </td>
-                  <td className="p-4 text-gray-900">
-                    {new Date(doc.date).toLocaleDateString('en-IN', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </td>
-                  <td className="p-4 text-gray-900">{slotLabel(doc.time)}</td>
-                  <td className="p-4 text-center font-medium">{doc.passenger_count}</td>
-                  <td className="p-4 text-right font-medium">
-                    ₹{doc.amount.toLocaleString('en-IN')}
-                  </td>
-                  <td className="p-4 text-center">
-                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-600">
-                      {doc.payment_status}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right">
-                    <button
-                      onClick={() => handleDownload(doc.booking_id)}
-                      disabled={!doc.has_document}
-                      className="btn-primary text-sm py-1.5 px-4 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin mx-auto" />
+          </div>
+        ) : files.length === 0 ? (
+          <div className="text-center py-12">
+            <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p className="text-gray-500 font-medium">No confirmed bookings yet</p>
+            <p className="text-gray-400 text-sm mt-1">Reports appear after successful payments.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {files.map((f) => {
+              const dateObj = new Date(f.date);
+              const dd = String(dateObj.getDate()).padStart(2, '0');
+              const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+              const yyyy = dateObj.getFullYear();
+              const label = dateObj.toLocaleDateString('en-IN', {
+                weekday: 'short',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              });
+
+              return (
+                <div
+                  key={f.date}
+                  className="flex items-center justify-between px-6 py-4 hover:bg-gray-50/50 transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
-                      Download
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">
+                        {dd}-{mm}-{yyyy}.xlsx
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {label} &middot; {f.booking_count} booking{f.booking_count > 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDownload(f.date)}
+                    className="px-4 py-2 bg-[#1e3a5f] text-white rounded-lg text-sm font-semibold hover:bg-[#2a4f7f] transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Download
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

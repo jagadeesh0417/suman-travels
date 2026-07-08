@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbExecute, rowsToObjects, rowToObject } from '@/lib/db';
+import { dbExecute, rowsToObjects } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
-import { generateBookingDocument } from '@/lib/document';
+import { generateDateExcel } from '@/lib/excel';
 
 export async function GET(request: NextRequest) {
   const email = await getAdminSession();
@@ -9,67 +9,44 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const download = searchParams.get('download');
+    const downloadDate = searchParams.get('download');
 
-    if (download) {
-      const bookingResult = await dbExecute(
-        `SELECT b.booking_id, b.passenger_count, b.payment_status, b.amount, b.created_at, d.date, s.time, s.vehicle_time
-         FROM bookings b
-         JOIN dates d ON b.date_id = d.id
-         JOIN slots s ON b.slot_id = s.id
-         WHERE b.booking_id = ?`,
-        [download]
-      );
-      const booking = rowToObject(bookingResult);
-      if (!booking) {
-        return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    // Download a specific date's Excel file
+    if (downloadDate) {
+      const bookings = await getBookingsForDate(downloadDate);
+      if (bookings.length === 0) {
+        return NextResponse.json({ error: 'No bookings found for this date' }, { status: 404 });
       }
 
-      const passengersResult = await dbExecute(
-        'SELECT name, mobile, gender FROM passengers WHERE booking_id = ? ORDER BY id',
-        [download]
-      );
-      const passengers = rowsToObjects(passengersResult) as { name: string; mobile: string; gender: string }[];
-
-      const buf = await generateBookingDocument({
-        bookingId: download,
-        paymentStatus: booking.payment_status as string,
-        date: booking.date as string,
-        time: booking.time as string,
-        vehicleTime: (booking.vehicle_time as string) || undefined,
-        examCenter: (booking.exam_center as string) || undefined,
-        passengerCount: Number(booking.passenger_count),
-        amount: Number(booking.amount),
-        passengers,
-      });
+      const buf = await generateDateExcel(downloadDate, bookings);
+      const fileName = downloadDate.replace(/-/g, '-');
+      const dateObj = new Date(downloadDate);
+      const dd = String(dateObj.getDate()).padStart(2, '0');
+      const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const yyyy = dateObj.getFullYear();
 
       return new NextResponse(new Uint8Array(buf), {
         headers: {
-          'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'Content-Disposition': `attachment; filename="${download}.docx"`,
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename="${dd}-${mm}-${yyyy}.xlsx"`,
         },
       });
     }
 
-    const result = await dbExecute(
-      `SELECT b.booking_id, b.passenger_count, b.payment_status, b.amount, b.created_at, d.date, s.time
+    // List all dates that have confirmed bookings
+    const datesResult = await dbExecute(
+      `SELECT d.date, COUNT(*) as booking_count
        FROM bookings b
        JOIN dates d ON b.date_id = d.id
-       JOIN slots s ON b.slot_id = s.id
        WHERE b.payment_status = 'confirmed'
-       ORDER BY b.created_at DESC`
+       GROUP BY d.date
+       ORDER BY d.date DESC`
     );
 
-    const bookings = rowsToObjects(result) as Record<string, unknown>[];
-    const documents = bookings.map((b) => ({
-      booking_id: b.booking_id,
-      date: b.date,
-      time: b.time,
-      passenger_count: b.passenger_count,
-      amount: b.amount,
-      payment_status: b.payment_status,
-      created_at: b.created_at,
-      has_document: true,
+    const dateRows = rowsToObjects(datesResult) as { date: string; booking_count: number }[];
+    const documents = dateRows.map((r) => ({
+      date: r.date,
+      booking_count: r.booking_count,
     }));
 
     return NextResponse.json(documents);
@@ -77,4 +54,20 @@ export async function GET(request: NextRequest) {
     console.error('[API /documents] GET error:', err?.message || err);
     return NextResponse.json({ error: 'Failed to fetch documents' }, { status: 500 });
   }
+}
+
+async function getBookingsForDate(dateStr: string) {
+  const result = await dbExecute(
+    `SELECT b.booking_id, b.exam_center, b.passenger_count, b.amount,
+            b.payment_status, b.created_at, d.date, s.time,
+            (SELECT p.name FROM passengers p WHERE p.booking_id = b.booking_id ORDER BY p.id LIMIT 1) as name,
+            (SELECT p.mobile FROM passengers p WHERE p.booking_id = b.booking_id ORDER BY p.id LIMIT 1) as mobile
+     FROM bookings b
+     JOIN dates d ON b.date_id = d.id
+     JOIN slots s ON b.slot_id = s.id
+     WHERE b.payment_status = 'confirmed' AND d.date = ?
+     ORDER BY s.time ASC, b.created_at ASC`,
+    [dateStr]
+  );
+  return rowsToObjects(result) as any[];
 }
