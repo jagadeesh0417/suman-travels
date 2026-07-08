@@ -212,6 +212,65 @@ function StepSelectSlot({
   );
 }
 
+function StepSelectExamCenter({
+  selectedCenter,
+  onBack,
+  onNext,
+}: {
+  selectedCenter: string;
+  onBack: () => void;
+  onNext: (center: string) => void;
+}) {
+  const [center, setCenter] = useState(selectedCenter);
+  const [error, setError] = useState('');
+
+  const handleSubmit = () => {
+    if (!center) { setError('Please select an exam center'); return; }
+    onNext(center);
+  };
+
+  return (
+    <div className="animate-fade-in">
+      <h2 className="text-2xl font-bold text-[#1e3a5f] mb-2">Select Exam Center</h2>
+      <p className="text-gray-500 mb-6">Choose the exam center for your travel booking.</p>
+
+      <div className="grid gap-3 mb-8">
+        {EXAM_CENTERS.map((c) => {
+          const selected = center === c;
+          return (
+            <button
+              key={c}
+              type="button"
+              onClick={() => { setCenter(c); setError(''); }}
+              className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                selected
+                  ? 'border-[#1e3a5f] bg-[#1e3a5f]/5 shadow-md'
+                  : 'border-gray-100 hover:border-gray-200 bg-white'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                  selected ? 'border-[#1e3a5f]' : 'border-gray-300'
+                }`}>
+                  {selected && <div className="w-2.5 h-2.5 rounded-full bg-[#1e3a5f]" />}
+                </div>
+                <span className={`font-medium ${selected ? 'text-[#1e3a5f]' : 'text-gray-700'}`}>{c}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {error && <p className="text-sm text-red-500 mb-4 text-center">{error}</p>}
+
+      <div className="flex gap-3">
+        <button onClick={onBack} className="btn-outline flex-1 justify-center">Back</button>
+        <button onClick={handleSubmit} className="btn-primary flex-1 justify-center">Continue</button>
+      </div>
+    </div>
+  );
+}
+
 function StepPassengerDetails({
   ticketCount,
   pricePerTicket,
@@ -223,7 +282,7 @@ function StepPassengerDetails({
   pricePerTicket: number;
   vehicleTime: string;
   onBack: () => void;
-  onNext: (passengers: PassengerForm[], examCenter: string) => void;
+  onNext: (passengers: PassengerForm[]) => void;
 }) {
   const [passengers, setPassengers] = useState<PassengerForm[]>(
     Array.from({ length: ticketCount }, () => ({
@@ -232,7 +291,6 @@ function StepPassengerDetails({
       gender: '',
     }))
   );
-  const [examCenter, setExamCenter] = useState('');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const updatePassenger = (
@@ -248,7 +306,6 @@ function StepPassengerDetails({
 
   const validate = () => {
     const newErrors: { [key: string]: string } = {};
-    if (!examCenter) newErrors['exam_center'] = 'Select exam center';
     passengers.forEach((p, i) => {
       if (!p.name.trim()) newErrors[`name_${i}`] = 'Name is required';
       if (!p.mobile.trim()) {
@@ -263,7 +320,7 @@ function StepPassengerDetails({
   };
 
   const handleSubmit = () => {
-    if (validate()) onNext(passengers, examCenter);
+    if (validate()) onNext(passengers);
   };
 
   return (
@@ -282,25 +339,6 @@ function StepPassengerDetails({
           Vehicle starts at {to12h(vehicleTime)}
         </p>
       )}
-
-      <div className="glass-card p-6 mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Exam Center <span className="text-red-500">*</span>
-        </label>
-        <select
-          value={examCenter}
-          onChange={(e) => { setExamCenter(e.target.value); setErrors({}); }}
-          className={`select-field ${errors['exam_center'] ? 'border-red-400' : ''}`}
-        >
-          <option value="">Select Exam Center</option>
-          {EXAM_CENTERS.map((center) => (
-            <option key={center} value={center}>{center}</option>
-          ))}
-        </select>
-        {errors['exam_center'] && (
-          <p className="text-xs text-red-500 mt-1">{errors['exam_center']}</p>
-        )}
-      </div>
 
       <div className="space-y-6">
         {passengers.map((passenger, index) => (
@@ -720,7 +758,7 @@ export default function BookPage() {
   const upiId = settings?.upi_id || '9848579053@paytm';
   const upiName = settings?.upi_name || 'Suman Travels';
 
-  const steps = ['Slot', 'Tickets', 'Details', 'Summary', 'Payment'];
+  const steps = ['Slot', 'Tickets', 'Center', 'Details', 'Summary', 'Payment'];
 
   const handleSlotNext = async (dateId: number, slotId: number) => {
     setSelectedDateId(dateId);
@@ -757,10 +795,14 @@ export default function BookPage() {
     setStep(2);
   };
 
-  const handlePassengersNext = (data: PassengerForm[], center: string) => {
-    setPassengers(data);
+  const handleExamCenterNext = (center: string) => {
     setExamCenter(center);
     setStep(3);
+  };
+
+  const handlePassengersNext = (data: PassengerForm[]) => {
+    setPassengers(data);
+    setStep(4);
   };
 
   const handleCreateBooking = async () => {
@@ -788,7 +830,7 @@ export default function BookPage() {
 
       const booking = await bookingRes.json();
       setBookingId(booking.booking_id);
-      setStep(4);
+      setStep(5);
       setProcessing(false);
     } catch {
       alert('Something went wrong. Please try again.');
@@ -930,16 +972,24 @@ export default function BookPage() {
           )}
 
           {step === 2 && (
-            <StepPassengerDetails
-              ticketCount={ticketCount}
-              pricePerTicket={pricePerTicket}
-              vehicleTime={selectedVehicleTimeStr}
+            <StepSelectExamCenter
+              selectedCenter={examCenter}
               onBack={() => setStep(1)}
-              onNext={handlePassengersNext}
+              onNext={handleExamCenterNext}
             />
           )}
 
           {step === 3 && (
+            <StepPassengerDetails
+              ticketCount={ticketCount}
+              pricePerTicket={pricePerTicket}
+              vehicleTime={selectedVehicleTimeStr}
+              onBack={() => setStep(2)}
+              onNext={handlePassengersNext}
+            />
+          )}
+
+          {step === 4 && (
             <StepSummary
               selectedDate={selectedDateStr}
               selectedTime={selectedTimeStr}
@@ -947,18 +997,18 @@ export default function BookPage() {
               examCenter={examCenter}
               passengers={passengers}
               pricePerTicket={pricePerTicket}
-              onBack={() => setStep(2)}
+              onBack={() => setStep(3)}
               onProceedToPayment={handleCreateBooking}
             />
           )}
 
-          {step === 4 && bookingId && (
+          {step === 5 && bookingId && (
             <StepUPIPayment
               amount={passengers.length * pricePerTicket}
               bookingRef={bookingId}
               upiId={upiId}
               upiName={upiName}
-              onBack={() => setStep(3)}
+              onBack={() => setStep(4)}
               onPaymentComplete={handlePaymentComplete}
               processing={processing}
             />
