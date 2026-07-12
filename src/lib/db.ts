@@ -338,15 +338,15 @@ async function ensureSchema(): Promise<void> {
   } catch {
   }
   try {
-    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN bharatpe_order_id TEXT DEFAULT ''" });
-  } catch {
-  }
-  try {
-    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN bharatpe_txn_id TEXT DEFAULT ''" });
-  } catch {
-  }
-  try {
     await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN payment_timestamp DATETIME DEFAULT NULL" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN razorpay_order_id TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN razorpay_payment_id TEXT DEFAULT ''" });
   } catch {
   }
 

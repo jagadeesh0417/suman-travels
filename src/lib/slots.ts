@@ -2,7 +2,7 @@ export const EXAM_CENTERS = [
   'G. Pulla Reddy Engineering College',
   'Brindavan Institute of Technology & Science',
   'K. V. Subba Reddy Institute of Technology',
-  'Poojya Doddappa Appa Education Society',
+  'Poojya Educational Society',
   'RGM College (Rajeev Gandhi Memorial College of Engineering & Technology)',
 ];
 

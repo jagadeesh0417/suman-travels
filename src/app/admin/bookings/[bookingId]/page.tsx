@@ -20,8 +20,8 @@ interface BookingDetail {
   payment_status: string;
   payment_id: string;
   utr_number: string;
-  bharatpe_order_id?: string;
-  bharatpe_txn_id?: string;
+  razorpay_order_id?: string;
+  razorpay_payment_id?: string;
   payment_timestamp?: string;
   created_at: string;
   passengers: Passenger[];
@@ -119,16 +119,16 @@ export default function BookingDetailPage({
                 <span className="font-mono text-sm text-gray-600">{booking.utr_number}</span>
               </div>
             )}
-            {booking.bharatpe_order_id && (
+            {booking.razorpay_order_id && (
               <div className="flex justify-between">
-                <span className="text-gray-500">BharatPe Order</span>
-                <span className="font-mono text-sm text-gray-600">{booking.bharatpe_order_id}</span>
+                <span className="text-gray-500">Razorpay Order</span>
+                <span className="font-mono text-sm text-gray-600">{booking.razorpay_order_id}</span>
               </div>
             )}
-            {booking.bharatpe_txn_id && (
+            {booking.razorpay_payment_id && (
               <div className="flex justify-between">
-                <span className="text-gray-500">BharatPe Txn ID</span>
-                <span className="font-mono text-sm text-gray-600">{booking.bharatpe_txn_id}</span>
+                <span className="text-gray-500">Razorpay Payment ID</span>
+                <span className="font-mono text-sm text-gray-600">{booking.razorpay_payment_id}</span>
               </div>
             )}
             {booking.payment_timestamp && (
