@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-import { dbExecute, rowsToObjects } from '@/lib/db';
+import { NextRequest, NextResponse } from 'next/server';
+import { dbExecute, rowsToObjects, getDb } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
 import { cleanupExpiredDates } from '@/lib/cleanup';
 
@@ -59,18 +59,36 @@ export async function PUT(request: Request) {
   }
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   const email = await getAdminSession();
   if (!email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
+    if (!id || isNaN(Number(id))) {
+      return NextResponse.json({ error: 'Valid date ID is required' }, { status: 400 });
+    }
 
-    await dbExecute('DELETE FROM slots WHERE date_id = ?', [Number(id)]);
-    await dbExecute('DELETE FROM dates WHERE id = ?', [Number(id)]);
-    return NextResponse.json({ message: 'Date deleted' });
+    const dateId = Number(id);
+
+    const existing = await dbExecute('SELECT id, date FROM dates WHERE id = ?', [dateId]);
+    if (!existing.rows || existing.rows.length === 0) {
+      return NextResponse.json({ error: 'Date not found' }, { status: 404 });
+    }
+
+    const db = await getDb();
+    const tx = await db.transaction('write');
+
+    try {
+      await tx.execute({ sql: 'DELETE FROM slots WHERE date_id = ?', args: [dateId] });
+      await tx.execute({ sql: 'DELETE FROM dates WHERE id = ?', args: [dateId] });
+      await tx.commit();
+      return NextResponse.json({ message: 'Date and associated slots deleted' });
+    } catch (e) {
+      await tx.rollback();
+      throw e;
+    }
   } catch (err: any) {
     console.error('[API /dates] DELETE error:', err?.message || err);
     return NextResponse.json({ error: 'Failed to delete date' }, { status: 500 });

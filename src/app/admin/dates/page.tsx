@@ -75,12 +75,19 @@ export default function AdminDates() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Delete this date and all associated slots?')) return;
+    if (!id || isNaN(Number(id))) {
+      showMessage('Invalid date ID');
+      return;
+    }
+    if (!confirm('Delete this date and all associated time slots? Existing bookings will not be affected.')) return;
 
     const res = await fetch(`/api/dates?id=${id}`, { method: 'DELETE' });
     if (res.ok) {
       loadDates();
       showMessage('Date deleted successfully');
+    } else {
+      const err = await res.json().catch(() => ({ error: 'Failed to delete date' }));
+      showMessage(err.error || 'Failed to delete date');
     }
   };
 
