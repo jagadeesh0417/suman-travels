@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 
 interface Stats {
@@ -10,15 +10,24 @@ interface Stats {
   revenue: number;
   pendingBookings: number;
   totalPassengers: number;
+  totalDates: number;
+  availableSeats: number;
 }
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
-  useEffect(() => {
+  const loadStats = () => {
     fetch('/api/admin/stats')
       .then((r) => r.json())
       .then(setStats);
+  };
+
+  useEffect(() => {
+    loadStats();
+    intervalRef.current = setInterval(loadStats, 30000);
+    return () => clearInterval(intervalRef.current);
   }, []);
 
   const cards = [
@@ -53,16 +62,24 @@ export default function AdminDashboard() {
       color: 'bg-pink-50 text-pink-600',
     },
     {
-      label: 'Total Payments',
-      value: `₹${(stats?.totalPayments ?? 0).toLocaleString('en-IN')}`,
-      icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+      label: 'Travel Dates',
+      value: stats?.totalDates ?? 0,
+      icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
       color: 'bg-teal-50 text-teal-600',
     },
   ];
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-[#1e3a5f] mb-6">Dashboard</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-[#1e3a5f]">Dashboard</h1>
+        <button
+          onClick={loadStats}
+          className="px-4 py-2 text-sm font-medium text-[#1e3a5f] bg-[#1e3a5f]/5 rounded-lg hover:bg-[#1e3a5f]/10 transition-colors"
+        >
+          ↻ Refresh
+        </button>
+      </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {cards.map((card) => (

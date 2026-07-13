@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 interface DateRecord {
   id: number;
@@ -13,6 +13,15 @@ export default function AdminDates() {
   const [newDate, setNewDate] = useState('');
   const [editId, setEditId] = useState<number | null>(null);
   const [editDate, setEditDate] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+  const messageTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const showMessage = (msg: string) => {
+    clearTimeout(messageTimer.current);
+    setMessage(msg);
+    messageTimer.current = setTimeout(() => setMessage(''), 3000);
+  };
 
   const loadDates = () => {
     fetch('/api/dates')
@@ -20,11 +29,12 @@ export default function AdminDates() {
       .then(setDates);
   };
 
-  useEffect(loadDates, []);
+  useEffect(() => { loadDates(); return () => clearTimeout(messageTimer.current); }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDate) return;
+    if (!newDate || submitting) return;
+    setSubmitting(true);
 
     const res = await fetch('/api/dates', {
       method: 'POST',
@@ -32,26 +42,35 @@ export default function AdminDates() {
       body: JSON.stringify({ date: newDate }),
     });
 
+    setSubmitting(false);
     if (res.ok) {
       setNewDate('');
       loadDates();
+      showMessage('Date created successfully');
     } else {
       const err = await res.json();
-      alert(err.error || 'Failed to create date');
+      showMessage(err.error || 'Failed to create date');
     }
   };
 
   const handleUpdate = async (id: number) => {
+    if (submitting) return;
+    setSubmitting(true);
+
     const res = await fetch('/api/dates', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, date: editDate }),
     });
 
+    setSubmitting(false);
     if (res.ok) {
       setEditId(null);
       setEditDate('');
       loadDates();
+      showMessage('Date updated successfully');
+    } else {
+      showMessage('Failed to update date');
     }
   };
 
@@ -59,12 +78,23 @@ export default function AdminDates() {
     if (!confirm('Delete this date and all associated slots?')) return;
 
     const res = await fetch(`/api/dates?id=${id}`, { method: 'DELETE' });
-    if (res.ok) loadDates();
+    if (res.ok) {
+      loadDates();
+      showMessage('Date deleted successfully');
+    }
   };
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-[#1e3a5f] mb-6">Manage Dates</h1>
+
+      {message && (
+        <div className={`mb-4 p-3 rounded-lg text-sm font-medium ${
+          message.includes('successfully') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+        }`}>
+          {message}
+        </div>
+      )}
 
       <form onSubmit={handleCreate} className="glass-card p-6 mb-6">
         <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -78,8 +108,8 @@ export default function AdminDates() {
             className="input-field flex-1"
             required
           />
-          <button type="submit" className="btn-primary">
-            Add Date
+          <button type="submit" className="btn-primary" disabled={submitting}>
+            {submitting ? 'Adding...' : 'Add Date'}
           </button>
         </div>
         <p className="text-xs text-gray-400 mt-2">
@@ -109,12 +139,15 @@ export default function AdminDates() {
                 <tr key={d.id} className="border-t border-gray-50 hover:bg-gray-50/50 transition-colors">
                   <td className="p-4">
                     {editId === d.id ? (
-                      <input
-                        type="date"
-                        value={editDate}
-                        onChange={(e) => setEditDate(e.target.value)}
-                        className="input-field"
-                      />
+                      <form onSubmit={(e) => { e.preventDefault(); handleUpdate(d.id); }}>
+                        <input
+                          type="date"
+                          value={editDate}
+                          onChange={(e) => setEditDate(e.target.value)}
+                          className="input-field"
+                          autoFocus
+                        />
+                      </form>
                     ) : (
                       <span className="font-medium text-gray-900">
                         {new Date(d.date).toLocaleDateString('en-IN', {
@@ -134,12 +167,13 @@ export default function AdminDates() {
                         <>
                           <button
                             onClick={() => handleUpdate(d.id)}
-                            className="px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-sm font-medium hover:bg-green-100 transition-colors"
+                            disabled={submitting}
+                            className="px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-sm font-medium hover:bg-green-100 transition-colors disabled:opacity-50"
                           >
-                            Save
+                            {submitting ? 'Saving...' : 'Save'}
                           </button>
                           <button
-                            onClick={() => setEditId(null)}
+                            onClick={() => { setEditId(null); setMessage(''); }}
                             className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors"
                           >
                             Cancel

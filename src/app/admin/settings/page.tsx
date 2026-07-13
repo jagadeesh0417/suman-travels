@@ -54,7 +54,7 @@ export default function AdminSettings() {
     <div>
       <h1 className="text-2xl font-bold text-[#1e3a5f] mb-6">Payment Settings</h1>
 
-      <div className="glass-card p-6 mb-6">
+      <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="glass-card p-6 mb-6">
         <h2 className="font-bold text-gray-900 mb-4">UPI Payment</h2>
         <div className="grid sm:grid-cols-2 gap-4 mb-6">
           <div>
@@ -156,13 +156,13 @@ export default function AdminSettings() {
         )}
 
         <button
-          onClick={handleSave}
+          type="submit"
           disabled={saving}
           className="btn-primary"
         >
           {saving ? 'Saving...' : 'Save Settings'}
         </button>
-      </div>
+      </form>
     </div>
   );
 }

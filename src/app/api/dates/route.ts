@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { dbExecute, rowsToObjects } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
+import { cleanupExpiredDates } from '@/lib/cleanup';
 
 export async function GET() {
   try {
+    await cleanupExpiredDates();
     const result = await dbExecute('SELECT * FROM dates ORDER BY date DESC');
     return NextResponse.json(rowsToObjects(result));
   } catch (err: any) {

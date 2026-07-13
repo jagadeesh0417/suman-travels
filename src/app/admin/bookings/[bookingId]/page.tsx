@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useCallback } from 'react';
 import Link from 'next/link';
 import { slotLabel } from '@/lib/slots';
 
@@ -23,6 +23,9 @@ interface BookingDetail {
   razorpay_order_id?: string;
   razorpay_payment_id?: string;
   payment_timestamp?: string;
+  customer_name?: string;
+  customer_mobile?: string;
+  customer_email?: string;
   created_at: string;
   passengers: Passenger[];
 }
@@ -35,11 +38,13 @@ export default function BookingDetailPage({
   const { bookingId } = use(params);
   const [booking, setBooking] = useState<BookingDetail | null>(null);
 
-  useEffect(() => {
+  const loadBooking = useCallback(() => {
     fetch(`/api/bookings/${bookingId}`)
       .then((r) => r.json())
       .then(setBooking);
   }, [bookingId]);
+
+  useEffect(loadBooking, [loadBooking]);
 
   if (!booking) {
     return (
@@ -61,6 +66,12 @@ export default function BookingDetailPage({
           </svg>
         </Link>
         <h1 className="text-2xl font-bold text-[#1e3a5f]">Booking Details</h1>
+        <button
+          onClick={loadBooking}
+          className="ml-auto px-4 py-2 text-sm font-medium text-[#1e3a5f] bg-[#1e3a5f]/5 rounded-lg hover:bg-[#1e3a5f]/10 transition-colors"
+        >
+          ↻ Refresh
+        </button>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6 mb-6">
@@ -117,6 +128,29 @@ export default function BookingDetailPage({
               <div className="flex justify-between">
                 <span className="text-gray-500">UTR Number</span>
                 <span className="font-mono text-sm text-gray-600">{booking.utr_number}</span>
+              </div>
+            )}
+            {(booking.customer_name || booking.customer_mobile) && (
+              <div className="border-t pt-3 mt-3">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Customer</p>
+                {booking.customer_name && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Name</span>
+                    <span className="font-medium">{booking.customer_name}</span>
+                  </div>
+                )}
+                {booking.customer_mobile && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Mobile</span>
+                    <span className="font-mono text-sm">{booking.customer_mobile}</span>
+                  </div>
+                )}
+                {booking.customer_email && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Email</span>
+                    <span className="text-sm">{booking.customer_email}</span>
+                  </div>
+                )}
               </div>
             )}
             {booking.razorpay_order_id && (

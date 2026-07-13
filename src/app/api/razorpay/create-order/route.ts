@@ -35,16 +35,16 @@ export async function POST(request: NextRequest) {
 
     const order = await createOrder(amount, booking_id);
 
-    await dbExecute(
-      "UPDATE bookings SET razorpay_order_id = ? WHERE booking_id = ?",
-      [order.id, booking_id]
-    );
-
     const passengersResult = await dbExecute(
       'SELECT name, mobile FROM passengers WHERE booking_id = ? ORDER BY id LIMIT 1',
       [booking_id]
     );
     const primaryPassenger = (passengersResult.rows[0] || {}) as any;
+
+    await dbExecute(
+      `UPDATE bookings SET razorpay_order_id = ?, customer_name = ?, customer_mobile = ? WHERE booking_id = ?`,
+      [order.id, primaryPassenger.name || '', primaryPassenger.mobile || '', booking_id]
+    );
 
     return NextResponse.json({
       success: true,

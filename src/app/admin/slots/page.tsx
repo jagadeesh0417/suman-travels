@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { EXAM_TIMINGS } from '@/lib/slots';
 
 interface SlotRecord {
@@ -16,6 +16,15 @@ export default function AdminSlots() {
   const [slots, setSlots] = useState<SlotRecord[]>([]);
   const [vehicleTimes, setVehicleTimes] = useState<Record<number, string>>({});
   const [generating, setGenerating] = useState(false);
+  const [savingVehicle, setSavingVehicle] = useState<Record<number, boolean>>({});
+  const [message, setMessage] = useState('');
+  const messageTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const showMessage = (msg: string) => {
+    clearTimeout(messageTimer.current);
+    setMessage(msg);
+    messageTimer.current = setTimeout(() => setMessage(''), 3000);
+  };
 
   const loadData = useCallback(() => {
     fetch('/api/slots')
@@ -28,7 +37,7 @@ export default function AdminSlots() {
       });
   }, []);
 
-  useEffect(loadData, [loadData]);
+  useEffect(() => { loadData(); return () => clearTimeout(messageTimer.current); }, [loadData]);
 
   const handleToggle = async (id: number, current: number) => {
     await fetch('/api/slots', {
@@ -37,15 +46,20 @@ export default function AdminSlots() {
       body: JSON.stringify({ id, enabled: current ? 0 : 1 }),
     });
     loadData();
+    showMessage(current ? 'Slot disabled' : 'Slot enabled');
   };
 
   const handleVehicleTimeSave = async (id: number) => {
+    if (savingVehicle[id]) return;
+    setSavingVehicle((prev) => ({ ...prev, [id]: true }));
     await fetch('/api/slots', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, vehicle_time: vehicleTimes[id] || '' }),
     });
+    setSavingVehicle((prev) => ({ ...prev, [id]: false }));
     loadData();
+    showMessage('Vehicle time saved');
   };
 
   const grouped = slots.reduce((acc, s) => {
@@ -66,6 +80,12 @@ export default function AdminSlots() {
         Fixed exam timings — slots are automatically created when you add a date.
         Set the vehicle start time for each slot.
       </p>
+
+      {message && (
+        <div className="mb-4 p-3 rounded-lg text-sm font-medium bg-green-50 text-green-700">
+          {message}
+        </div>
+      )}
 
       <button
         onClick={async () => {
@@ -119,7 +139,10 @@ export default function AdminSlots() {
 
                   {slot && (
                     <>
-                      <div className="flex items-center gap-2">
+                      <form
+                        onSubmit={(e) => { e.preventDefault(); handleVehicleTimeSave(slot.id); }}
+                        className="flex items-center gap-2"
+                      >
                         <label className="text-xs text-gray-500 whitespace-nowrap">Vehicle</label>
                         <input
                           type="time"
@@ -130,12 +153,13 @@ export default function AdminSlots() {
                           className="input-field !py-1.5 !text-sm !w-32"
                         />
                         <button
-                          onClick={() => handleVehicleTimeSave(slot.id)}
-                          className="px-3 py-1.5 bg-[#1e3a5f] text-white rounded-lg text-xs font-semibold hover:bg-[#2a4f7f] transition-colors shadow-sm"
+                          type="submit"
+                          disabled={savingVehicle[slot.id]}
+                          className="px-3 py-1.5 bg-[#1e3a5f] text-white rounded-lg text-xs font-semibold hover:bg-[#2a4f7f] transition-colors shadow-sm disabled:opacity-50"
                         >
-                          Save
+                          {savingVehicle[slot.id] ? '...' : 'Save'}
                         </button>
-                      </div>
+                      </form>
 
                       <button
                         onClick={() => handleToggle(slot.id, slot.enabled)}
