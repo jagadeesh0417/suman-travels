@@ -15,7 +15,12 @@ export async function cleanupExpiredDates(): Promise<number> {
     for (const id of expiredIds) {
       await dbExecute('DELETE FROM slots WHERE date_id = ?', [id]);
       await dbExecute('DELETE FROM bookings WHERE date_id = ? AND payment_status != \'confirmed\'', [id]);
-      await dbExecute('DELETE FROM dates WHERE id = ?', [id]);
+      // Only delete the date if no confirmed bookings remain (FK constraint safety)
+      const remaining = await dbExecute("SELECT COUNT(*) as cnt FROM bookings WHERE date_id = ? AND payment_status = 'confirmed'", [id]);
+      const row = remaining.rows[0] as any;
+      if (!row || Number(row.cnt) === 0) {
+        await dbExecute('DELETE FROM dates WHERE id = ?', [id]);
+      }
     }
 
     console.log(`[Cleanup] Deleted ${expiredIds.length} expired dates (older than 3 days)`);

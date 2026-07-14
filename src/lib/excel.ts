@@ -13,6 +13,12 @@ export interface BookingRow {
   passenger_count: number;
   amount: number;
   payment_status: string;
+  razorpay_payment_id?: string;
+  razorpay_order_id?: string;
+  razorpay_bank_ref?: string;
+  razorpay_status?: string;
+  razorpay_method?: string;
+  payment_timestamp?: string;
   created_at: string;
 }
 
@@ -28,10 +34,13 @@ const HEADER_COLUMNS = [
   'Passengers',
   'Amount (₹)',
   'Payment Status',
+  'Razorpay Payment ID',
+  'Razorpay Order ID',
+  'UTR / Bank Ref',
   'Booking Date & Time',
 ];
 
-const COL_WIDTHS = [10, 14, 22, 16, 10, 36, 16, 18, 12, 14, 16, 20];
+const COL_WIDTHS = [10, 14, 22, 16, 10, 36, 16, 18, 12, 14, 16, 24, 24, 24, 20];
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -81,7 +90,7 @@ export async function generateDateExcel(
   // Title row
   const titleRow = ws.addRow([`Travel Date: ${formatDate(dateStr)}`]);
   titleRow.font = titleFont;
-  ws.mergeCells(`A${titleRow.number}:L${titleRow.number}`);
+  ws.mergeCells(`A${titleRow.number}:O${titleRow.number}`);
   titleRow.height = 30;
 
   ws.addRow([]); // spacer
@@ -102,7 +111,7 @@ export async function generateDateExcel(
     // Exam Center header row
     const centerRow = ws.addRow([`EXAM CENTER: ${center}`]);
     centerRow.font = groupFont;
-    ws.mergeCells(`A${centerRow.number}:L${centerRow.number}`);
+    ws.mergeCells(`A${centerRow.number}:O${centerRow.number}`);
     centerRow.height = 24;
     ws.addRow([]);
 
@@ -110,7 +119,7 @@ export async function generateDateExcel(
       // Slot header row
       const slotRow = ws.addRow([slot]);
       slotRow.font = slotFont;
-      ws.mergeCells(`A${slotRow.number}:L${slotRow.number}`);
+      ws.mergeCells(`A${slotRow.number}:O${slotRow.number}`);
       slotRow.height = 22;
 
       // Column headers
@@ -135,6 +144,9 @@ export async function generateDateExcel(
           b.passenger_count,
           b.amount,
           b.payment_status === 'confirmed' ? 'Confirmed' : b.payment_status,
+          b.razorpay_payment_id || '-',
+          b.razorpay_order_id || '-',
+          b.razorpay_bank_ref || '-',
           formatDateTime(b.created_at),
         ]);
         dataRow.font = dataFont;
@@ -179,7 +191,7 @@ export async function generateAllDatesExcel(
 
     const titleRow = ws.addRow([`Travel Date: ${formatDate(dateStr)}`]);
     titleRow.font = titleFont;
-    ws.mergeCells(`A${titleRow.number}:L${titleRow.number}`);
+    ws.mergeCells(`A${titleRow.number}:O${titleRow.number}`);
     titleRow.height = 30;
     ws.addRow([]);
 
@@ -195,14 +207,14 @@ export async function generateAllDatesExcel(
     for (const [center, slots] of Object.entries(groups)) {
       const centerRow = ws.addRow([`EXAM CENTER: ${center}`]);
       centerRow.font = groupFont;
-      ws.mergeCells(`A${centerRow.number}:L${centerRow.number}`);
+      ws.mergeCells(`A${centerRow.number}:O${centerRow.number}`);
       centerRow.height = 24;
       ws.addRow([]);
 
       for (const [slot, rows] of Object.entries(slots)) {
         const slotRow = ws.addRow([slot]);
         slotRow.font = slotFont;
-        ws.mergeCells(`A${slotRow.number}:L${slotRow.number}`);
+        ws.mergeCells(`A${slotRow.number}:O${slotRow.number}`);
         slotRow.height = 22;
 
         const headerRow = ws.addRow(HEADER_COLUMNS);
@@ -225,6 +237,9 @@ export async function generateAllDatesExcel(
             b.passenger_count,
             b.amount,
             b.payment_status === 'confirmed' ? 'Confirmed' : b.payment_status,
+            b.razorpay_payment_id || '-',
+            b.razorpay_order_id || '-',
+            b.razorpay_bank_ref || '-',
             formatDateTime(b.created_at),
           ]);
           dataRow.font = dataFont;

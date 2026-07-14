@@ -13,7 +13,10 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || '';
 
     let query = `
-      SELECT b.*, d.date, s.time, s.vehicle_time
+      SELECT b.*, d.date, s.time, s.vehicle_time,
+        (SELECT p.name FROM passengers p WHERE p.booking_id = b.booking_id ORDER BY p.id LIMIT 1) as customer_name_ext,
+        (SELECT p.mobile FROM passengers p WHERE p.booking_id = b.booking_id ORDER BY p.id LIMIT 1) as customer_mobile_ext,
+        (SELECT p.gender FROM passengers p WHERE p.booking_id = b.booking_id ORDER BY p.id LIMIT 1) as gender
       FROM bookings b
       JOIN dates d ON b.date_id = d.id
       JOIN slots s ON b.slot_id = s.id
@@ -22,8 +25,21 @@ export async function GET(request: NextRequest) {
     const params: (string | number)[] = [];
 
     if (search) {
-      query += ' AND (b.booking_id LIKE ? OR d.date LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
+      query += ` AND (
+        b.booking_id LIKE ?
+        OR d.date LIKE ?
+        OR b.serial_number LIKE ?
+        OR b.customer_name LIKE ?
+        OR b.customer_mobile LIKE ?
+        OR EXISTS (
+          SELECT 1 FROM passengers p
+          WHERE p.booking_id = b.booking_id
+          AND (p.name LIKE ? OR p.mobile LIKE ?)
+        )
+      )`;
+      // booking_id, date, serial_number, customer_name, customer_mobile, p.name, p.mobile
+      const s = `%${search}%`;
+      params.push(s, s, s, s, s, s, s);
     }
 
     if (status) {

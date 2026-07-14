@@ -81,10 +81,13 @@ export async function DELETE(request: NextRequest) {
     const tx = await db.transaction('write');
 
     try {
+      // Delete all slots for this date
       await tx.execute({ sql: 'DELETE FROM slots WHERE date_id = ?', args: [dateId] });
-      await tx.execute({ sql: 'DELETE FROM dates WHERE id = ?', args: [dateId] });
+      // Delete non-confirmed bookings (they can't exist without slots)
+      await tx.execute({ sql: "DELETE FROM bookings WHERE date_id = ? AND payment_status != 'confirmed'", args: [dateId] });
+      // Keep the date row so confirmed bookings' FK constraints remain valid
       await tx.commit();
-      return NextResponse.json({ message: 'Date and associated slots deleted' });
+      return NextResponse.json({ message: 'Date slots deleted. Confirmed bookings preserved.' });
     } catch (e) {
       await tx.rollback();
       throw e;

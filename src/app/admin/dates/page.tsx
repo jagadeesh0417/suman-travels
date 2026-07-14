@@ -79,7 +79,7 @@ export default function AdminDates() {
       showMessage('Invalid date ID');
       return;
     }
-    if (!confirm('Delete this date and all associated time slots? Existing bookings will not be affected.')) return;
+    if (!confirm('Delete all slots and pending bookings for this date? Confirmed bookings will be preserved.')) return;
 
     const res = await fetch(`/api/dates?id=${id}`, { method: 'DELETE' });
     if (res.ok) {

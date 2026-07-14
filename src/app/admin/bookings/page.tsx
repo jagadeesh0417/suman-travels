@@ -6,12 +6,23 @@ import { slotLabel } from '@/lib/slots';
 
 interface BookingRecord {
   booking_id: string;
+  serial_number?: number;
+  customer_name_ext?: string;
+  customer_mobile_ext?: string;
+  customer_name?: string;
+  customer_mobile?: string;
+  gender?: string;
+  customer_email?: string;
   date: string;
   time: string;
+  exam_center?: string;
   passenger_count: number;
   amount: number;
   payment_status: string;
-  utr_number: string;
+  razorpay_payment_id?: string;
+  razorpay_order_id?: string;
+  razorpay_bank_ref?: string;
+  utr_number?: string;
   created_at: string;
 }
 
@@ -41,7 +52,7 @@ export default function AdminBookings() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by ID or date..."
+            placeholder="Search by Sl No, ID, Name, Mobile, Date..."
             className="input-field max-w-xs"
           />
           <select
@@ -61,69 +72,91 @@ export default function AdminBookings() {
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50">
-                <th className="text-left p-4 text-sm font-semibold text-gray-700">Booking ID</th>
-                <th className="text-left p-4 text-sm font-semibold text-gray-700">Date</th>
-                <th className="text-left p-4 text-sm font-semibold text-gray-700">Time</th>
-                <th className="text-center p-4 text-sm font-semibold text-gray-700">Passengers</th>
-                <th className="text-right p-4 text-sm font-semibold text-gray-700">Amount</th>
-                <th className="text-center p-4 text-sm font-semibold text-gray-700">Status</th>
-                <th className="text-left p-4 text-sm font-semibold text-gray-700">UTR</th>
-                <th className="text-right p-4 text-sm font-semibold text-gray-700">Action</th>
+                <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Sl No</th>
+                <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Booking ID</th>
+                <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Candidate Name</th>
+                <th className="text-center p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Gender</th>
+                <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Mobile</th>
+                <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Email</th>
+                <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Exam Date</th>
+                <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Slot</th>
+                <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Exam Center</th>
+                <th className="text-center p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Tickets</th>
+                <th className="text-center p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Status</th>
+                <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Razorpay Payment ID</th>
+                <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Razorpay Order ID</th>
+                <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">UTR / Bank Ref</th>
+                <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Booking Time</th>
+                <th className="text-right p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Action</th>
               </tr>
             </thead>
             <tbody>
               {bookings.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-gray-500">
+                  <td colSpan={16} className="p-8 text-center text-gray-500">
                     No bookings found
                   </td>
                 </tr>
               )}
-              {bookings.map((b) => (
-                <tr key={b.booking_id} className="border-t border-gray-50 hover:bg-gray-50/50 transition-colors">
-                  <td className="p-4">
-                    <span className="font-mono font-medium text-[#1e3a5f] text-sm">
-                      {b.booking_id}
-                    </span>
-                  </td>
-                  <td className="p-4 text-gray-900">
-                    {new Date(b.date).toLocaleDateString('en-IN', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </td>
-                  <td className="p-4 text-gray-900">{slotLabel(b.time)}</td>
-                  <td className="p-4 text-center font-medium">{b.passenger_count}</td>
-                  <td className="p-4 text-right font-medium">
-                    ₹{b.amount.toLocaleString('en-IN')}
-                  </td>
-                  <td className="p-4 text-center">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        b.payment_status === 'confirmed'
-                          ? 'bg-green-50 text-green-600'
-                          : 'bg-amber-50 text-amber-600'
-                      }`}
-                    >
-                      {b.payment_status}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <span className="font-mono text-xs text-gray-500">
-                      {b.utr_number || '-'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right">
-                    <Link
-                      href={`/admin/bookings/${b.booking_id}`}
-                      className="px-3 py-1.5 bg-[#1e3a5f]/5 text-[#1e3a5f] rounded-lg text-sm font-medium hover:bg-[#1e3a5f]/10 transition-colors"
-                    >
-                      View
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+              {bookings.map((b) => {
+                const name = b.customer_name_ext || b.customer_name || '';
+                const mobile = b.customer_mobile_ext || b.customer_mobile || '';
+                return (
+                  <tr key={b.booking_id} className="border-t border-gray-50 hover:bg-gray-50/50 transition-colors">
+                    <td className="p-3 whitespace-nowrap">
+                      <span className="font-mono text-sm font-medium text-[#1e3a5f]">
+                        {b.serial_number || '-'}
+                      </span>
+                    </td>
+                    <td className="p-3 whitespace-nowrap">
+                      <span className="font-mono text-xs text-gray-700">{b.booking_id}</span>
+                    </td>
+                    <td className="p-3 whitespace-nowrap text-sm text-gray-900">{name || '-'}</td>
+                    <td className="p-3 whitespace-nowrap text-sm text-center text-gray-600">{b.gender || '-'}</td>
+                    <td className="p-3 whitespace-nowrap font-mono text-sm text-gray-600">{mobile || '-'}</td>
+                    <td className="p-3 whitespace-nowrap text-sm text-gray-600">{b.customer_email || '-'}</td>
+                    <td className="p-3 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(b.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="p-3 whitespace-nowrap text-sm text-gray-700">{slotLabel(b.time)}</td>
+                    <td className="p-3 whitespace-nowrap text-sm text-gray-600 max-w-[180px] truncate" title={b.exam_center || ''}>
+                      {b.exam_center || '-'}
+                    </td>
+                    <td className="p-3 whitespace-nowrap text-sm text-center font-medium">{b.passenger_count}</td>
+                    <td className="p-3 whitespace-nowrap text-center">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          b.payment_status === 'confirmed'
+                            ? 'bg-green-50 text-green-600'
+                            : 'bg-amber-50 text-amber-600'
+                        }`}
+                      >
+                        {b.payment_status}
+                      </span>
+                    </td>
+                    <td className="p-3 whitespace-nowrap font-mono text-xs text-gray-500 max-w-[120px] truncate" title={b.razorpay_payment_id || ''}>
+                      {b.razorpay_payment_id || '-'}
+                    </td>
+                    <td className="p-3 whitespace-nowrap font-mono text-xs text-gray-500 max-w-[120px] truncate" title={b.razorpay_order_id || ''}>
+                      {b.razorpay_order_id || '-'}
+                    </td>
+                    <td className="p-3 whitespace-nowrap font-mono text-xs text-gray-500 max-w-[120px] truncate" title={b.razorpay_bank_ref || ''}>
+                      {b.razorpay_bank_ref || b.utr_number || '-'}
+                    </td>
+                    <td className="p-3 whitespace-nowrap text-xs text-gray-500">
+                      {new Date(b.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td className="p-3 text-right whitespace-nowrap">
+                      <Link
+                        href={`/admin/bookings/${b.booking_id}`}
+                        className="px-3 py-1.5 bg-[#1e3a5f]/5 text-[#1e3a5f] rounded-lg text-sm font-medium hover:bg-[#1e3a5f]/10 transition-colors"
+                      >
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
