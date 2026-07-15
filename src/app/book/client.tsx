@@ -697,18 +697,34 @@ export default function BookPageClient() {
   useEffect(() => {
     const error = searchParams.get('error');
     const bid = searchParams.get('id');
-    if (error && bid) {
+    if (bid) {
       setBookingId(bid);
-      setStep(5);
-      if (error === 'payment_failed') {
-        setPaymentError('Payment was not completed. Please try again.');
-      } else if (error === 'server_error') {
-        setPaymentError('A server error occurred. Please try again.');
-      } else {
-        setPaymentError('Payment could not be processed. Please try again.');
+      if (error) {
+        setStep(5);
+        if (error === 'payment_failed') {
+          setPaymentError('Payment was not completed. Please try again.');
+        } else if (error === 'server_error') {
+          setPaymentError('A server error occurred. Please try again.');
+        } else {
+          setPaymentError('Payment could not be processed. Please try again.');
+        }
       }
     }
   }, [searchParams]);
+
+  // If user lands on payment step and booking is already confirmed, redirect
+  useEffect(() => {
+    if (bookingId && step === 5) {
+      fetch(`/api/razorpay/status?booking_id=${bookingId}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.status === 'confirmed') {
+            router.push(`/success?id=${bookingId}`);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [bookingId, step, router]);
 
   const pricePerTicket = settings ? Number(settings.price_per_ticket) || 500 : 500;
 
@@ -812,6 +828,55 @@ export default function BookPageClient() {
         return;
       }
 
+      // Shared state between callbacks to prevent duplicate processing
+      let paymentCompleted = false;
+      let pollingInterval: ReturnType<typeof setInterval> | null = null;
+      let pollingStopped = false;
+
+      const stopPolling = () => {
+        pollingStopped = true;
+        if (pollingInterval) {
+          clearInterval(pollingInterval);
+          pollingInterval = null;
+        }
+      };
+
+      // Start polling as fallback for desktop QR / UPI payments
+      // where the Razorpay handler callback may not fire reliably
+      const startPolling = () => {
+        const startTime = Date.now();
+        const maxWait = 5 * 60 * 1000; // 5 minutes
+
+        pollingInterval = setInterval(async () => {
+          if (pollingStopped || paymentCompleted) return;
+          if (Date.now() - startTime > maxWait) {
+            stopPolling();
+            if (!paymentCompleted) {
+              setPaymentError('Payment verification timed out. Check your booking or contact support.');
+              setProcessing(false);
+            }
+            return;
+          }
+
+          try {
+            const statusRes = await fetch(`/api/razorpay/status?booking_id=${bookingId}`);
+            const statusData = await statusRes.json();
+
+            if (statusData.status === 'confirmed') {
+              paymentCompleted = true;
+              stopPolling();
+              router.push(`/success?id=${bookingId}`);
+            } else if (statusData.status === 'failed' || statusData.status === 'error') {
+              stopPolling();
+              setPaymentError(statusData.error || 'Payment failed. Please try again.');
+              setProcessing(false);
+            }
+          } catch {
+            // Network error — retry on next interval
+          }
+        }, 3000);
+      };
+
       const options = {
         key: data.key_id,
         amount: data.amount,
@@ -825,6 +890,9 @@ export default function BookPageClient() {
         },
         theme: { color: '#1e3a5f' },
         handler: async function (response: any) {
+          stopPolling();
+          if (paymentCompleted) return; // Prevent duplicate
+          paymentCompleted = true;
           setProcessing(true);
           const verifyRes = await fetch('/api/razorpay/verify', {
             method: 'POST',
@@ -847,19 +915,27 @@ export default function BookPageClient() {
         },
         modal: {
           ondismiss: function () {
-            setPaymentError('Payment cancelled. Please try again.');
-            setProcessing(false);
+            stopPolling();
+            if (!paymentCompleted) {
+              setPaymentError('Payment cancelled. Please try again.');
+              setProcessing(false);
+            }
           },
         },
       };
 
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', function (response: any) {
+        stopPolling();
+        paymentCompleted = true;
         setPaymentError(response.error?.description || 'Payment failed. Please try again.');
         setProcessing(false);
       });
       rzp.open();
       setProcessing(false);
+
+      // Start polling fallback after modal opens
+      startPolling();
     } catch {
       setPaymentError('Could not connect to payment gateway. Please try again.');
       setProcessing(false);
