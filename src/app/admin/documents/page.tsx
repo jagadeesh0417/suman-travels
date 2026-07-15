@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 
 interface DateFile {
   date: string;
@@ -10,20 +10,38 @@ interface DateFile {
 export default function AdminDocuments() {
   const [files, setFiles] = useState<DateFile[]>([]);
   const [loading, setLoading] = useState(true);
+  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
+
+  const loadFiles = useCallback(async () => {
+    try {
+      const res = await fetch('/api/documents', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        setFiles(data);
+      }
+    } catch {
+      // silent
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetch('/api/documents')
-      .then((r) => r.json())
-      .then((data) => {
-        setFiles(data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
+    loadFiles();
+    // Auto-refresh every 15 seconds
+    intervalRef.current = setInterval(loadFiles, 15000);
+    // Refresh on page focus (admin returns to tab)
+    const onFocus = () => { loadFiles(); };
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(intervalRef.current);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [loadFiles]);
 
   const handleDownload = async (date: string) => {
     try {
-      const res = await fetch(`/api/documents?download=${date}`);
+      const res = await fetch(`/api/documents?download=${date}`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Document not found');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -43,9 +61,20 @@ export default function AdminDocuments() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-[#1e3a5f] mb-2">Date-wise Reports</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+        <h1 className="text-2xl font-bold text-[#1e3a5f]">Date-wise Reports</h1>
+        <button
+          onClick={loadFiles}
+          className="px-4 py-2 text-sm font-medium text-[#1e3a5f] bg-[#1e3a5f]/5 rounded-lg hover:bg-[#1e3a5f]/10 transition-colors flex items-center gap-2 self-start"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh
+        </button>
+      </div>
       <p className="text-gray-500 mb-6">
-        One Excel file per travel date, grouped by Exam Center and Slot.
+        One Excel file per travel date, grouped by Exam Center and Slot. Auto-refreshes every 15 seconds.
       </p>
 
       <div className="glass-card overflow-hidden">

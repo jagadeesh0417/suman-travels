@@ -121,6 +121,8 @@ export async function confirmBooking(
   const { slotLabel } = await import('@/lib/slots');
   const { appendBookingToSheet } = await import('@/lib/google-sheets');
 
+  console.log(`[confirmBooking] Confirming booking ${booking_id}, order=${razorpay_order_id}, payment=${razorpay_payment_id}`);
+
   // Fetch and validate payment details from Razorpay
   let paymentDetails: RazorpayPaymentDetails;
   try {
@@ -210,6 +212,8 @@ export async function confirmBooking(
     }
 
     await tx.commit();
+
+    console.log(`[confirmBooking] Booking ${booking_id} confirmed with serial ${serialNumber}`);
 
     // Fire-and-forget Google Sheets append
     (async () => {

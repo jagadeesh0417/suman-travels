@@ -13,8 +13,10 @@ export async function GET(request: NextRequest) {
 
     // Download a specific date's Excel file
     if (downloadDate) {
+      console.log(`[Documents] Download requested for ${downloadDate}`);
       const bookings = await getBookingsForDate(downloadDate);
       if (bookings.length === 0) {
+        console.log(`[Documents] No bookings found for ${downloadDate}`);
         return NextResponse.json({ error: 'No bookings found for this date' }, { status: 404 });
       }
 
@@ -25,10 +27,12 @@ export async function GET(request: NextRequest) {
       const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
       const yyyy = dateObj.getFullYear();
 
+      console.log(`[Documents] Generated Excel for ${downloadDate}: ${bookings.length} bookings`);
       return new NextResponse(new Uint8Array(buf), {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           'Content-Disposition': `attachment; filename="${dd}-${mm}-${yyyy}.xlsx"`,
+          'Cache-Control': 'no-store, must-revalidate',
         },
       });
     }
@@ -49,7 +53,10 @@ export async function GET(request: NextRequest) {
       booking_count: r.booking_count,
     }));
 
-    return NextResponse.json(documents);
+    console.log(`[Documents] Listed ${documents.length} dates with confirmed bookings`);
+    return NextResponse.json(documents, {
+      headers: { 'Cache-Control': 'no-store, must-revalidate' },
+    });
   } catch (err: any) {
     console.error('[API /documents] GET error:', err?.message || err);
     return NextResponse.json({ error: 'Failed to fetch documents' }, { status: 500 });
