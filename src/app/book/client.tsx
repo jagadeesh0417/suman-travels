@@ -573,21 +573,25 @@ function StepRazorpayPayment({
   bookingRef,
   onBack,
   onPay,
+  onCheckStatus,
   paymentError,
   processing,
+  checkingStatus,
 }: {
   amount: number;
   bookingRef: string;
   onBack: () => void;
   onPay: () => void;
+  onCheckStatus: () => void;
   paymentError: string;
   processing: boolean;
+  checkingStatus: boolean;
 }) {
   return (
     <div className="animate-fade-in">
       <h2 className="text-2xl font-bold text-[#1e3a5f] mb-2">Complete Payment</h2>
       <p className="text-gray-500 mb-8">
-        You will be redirected to Razorpay Checkout for secure payment.
+        Complete your payment using Razorpay. If you already paid, click "Check Payment Status".
       </p>
 
       {paymentError && (
@@ -641,6 +645,29 @@ function StepRazorpayPayment({
         </button>
 
         <button
+          onClick={onCheckStatus}
+          disabled={checkingStatus}
+          className="btn-outline w-full justify-center disabled:opacity-50"
+        >
+          {checkingStatus ? (
+            <>
+              <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Checking...
+            </>
+          ) : (
+            <>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Already Paid? Check Status
+            </>
+          )}
+        </button>
+
+        <button
           onClick={onBack}
           disabled={processing}
           className="btn-outline w-full justify-center disabled:opacity-50"
@@ -671,6 +698,7 @@ export default function BookPageClient() {
   const [passengers, setPassengers] = useState<PassengerForm[]>([]);
   const [examCenter, setExamCenter] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState('');
   const [settings, setSettings] = useState<{ price_per_ticket: string } | null>(null);
@@ -699,8 +727,8 @@ export default function BookPageClient() {
     const bid = searchParams.get('id');
     if (bid) {
       setBookingId(bid);
+      setStep(5);
       if (error) {
-        setStep(5);
         if (error === 'payment_failed') {
           setPaymentError('Payment was not completed. Please try again.');
         } else if (error === 'server_error') {
@@ -712,10 +740,21 @@ export default function BookPageClient() {
     }
   }, [searchParams]);
 
+  // Sync booking ID to URL so page refreshes don't lose the booking context
+  useEffect(() => {
+    if (bookingId && step >= 5) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('id') !== bookingId) {
+        params.set('id', bookingId);
+        router.replace(`/book?${params.toString()}`, { scroll: false });
+      }
+    }
+  }, [bookingId, step, router]);
+
   // If user lands on payment step and booking is already confirmed, redirect
   useEffect(() => {
     if (bookingId && step === 5) {
-      fetch(`/api/razorpay/status?booking_id=${bookingId}`)
+      fetch(`/api/razorpay/status?booking_id=${bookingId}`, { cache: 'no-store' })
         .then((r) => r.json())
         .then((data) => {
           if (data.status === 'confirmed') {
@@ -805,6 +844,36 @@ export default function BookPageClient() {
     } catch {
       alert('Something went wrong. Please try again.');
       setProcessing(false);
+    }
+  };
+
+  const handleCheckPaymentStatus = async () => {
+    if (!bookingId) return;
+    setCheckingStatus(true);
+    setPaymentError('');
+
+    try {
+      const res = await fetch('/api/razorpay/recover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.status === 'confirmed') {
+        router.push(`/success?id=${bookingId}`);
+      } else if (data.status === 'no_order') {
+        setPaymentError('Payment has not been initiated yet. Please click "Pay with Razorpay" to start.');
+      } else if (data.status === 'created' || data.status === 'attempted') {
+        setPaymentError('Payment is still processing. Please wait or try again in a few seconds.');
+      } else {
+        setPaymentError(data.error || 'Payment not found. Please try paying again.');
+      }
+    } catch {
+      setPaymentError('Could not check payment status. Please try again.');
+    } finally {
+      setCheckingStatus(false);
     }
   };
 
@@ -1087,8 +1156,10 @@ export default function BookPageClient() {
               bookingRef={bookingId}
               onBack={() => setStep(4)}
               onPay={handleRazorpayPayment}
+              onCheckStatus={handleCheckPaymentStatus}
               paymentError={paymentError}
               processing={processing}
+              checkingStatus={checkingStatus}
             />
           )}
         </div>

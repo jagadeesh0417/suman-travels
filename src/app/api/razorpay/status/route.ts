@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbExecute, rowToObject } from '@/lib/db';
-import { fetchOrderStatus, fetchOrderPayments, computeSignature, confirmBooking } from '@/lib/razorpay';
+import { fetchOrderStatus, fetchOrderPayments, confirmBooking } from '@/lib/razorpay';
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
 
     // If already confirmed, return immediately
     if (booking.payment_status === 'confirmed') {
+      console.log(`[Status] Booking ${bookingId} already confirmed`);
       return NextResponse.json({
         status: 'confirmed',
         booking_id: bookingId,
@@ -33,62 +34,54 @@ export async function GET(request: NextRequest) {
 
     const razorpayOrderId = booking.razorpay_order_id as string;
     if (!razorpayOrderId) {
-      return NextResponse.json({ status: 'pending', message: 'Order not yet created' });
+      return NextResponse.json({ status: 'pending', message: 'Payment not yet initiated' });
     }
 
     // Fetch order status from Razorpay
     let order;
     try {
       order = await fetchOrderStatus(razorpayOrderId);
+      console.log(`[Status] Order ${razorpayOrderId} status: ${order.status}`);
     } catch (err: any) {
-      console.error('[API /razorpay/status] fetchOrderStatus error:', err?.message || err);
-      return NextResponse.json({ status: 'error', error: 'Failed to check payment status' });
+      console.error(`[Status] fetchOrderStatus error for ${razorpayOrderId}:`, err?.message || err);
+      return NextResponse.json({ status: 'error', error: 'Failed to check payment status with Razorpay' });
     }
 
     if (order.status !== 'paid') {
-      return NextResponse.json({ status: order.status, message: 'Payment not completed yet' });
+      return NextResponse.json({ status: order.status, message: 'Awaiting payment...' });
     }
 
-    // Order is paid — fetch the payment ID and auto-verify
+    // Order is paid — fetch the payment ID and confirm the booking
     let payments;
     try {
       payments = await fetchOrderPayments(razorpayOrderId);
+      console.log(`[Status] Payments for order ${razorpayOrderId}: ${payments.length} found`);
     } catch (err: any) {
-      console.error('[API /razorpay/status] fetchOrderPayments error:', err?.message || err);
-      return NextResponse.json({ status: 'paid_no_payment_id', error: 'Payment found but could not fetch payment details' });
+      console.error(`[Status] fetchOrderPayments error for ${razorpayOrderId}:`, err?.message || err);
+      return NextResponse.json({ status: 'error', error: 'Payment confirmed but could not fetch payment details' });
     }
 
     const paidPayment = payments.find(p => p.status === 'captured') || payments[0];
     if (!paidPayment) {
-      return NextResponse.json({ status: 'paid_no_payment', error: 'Order is paid but no payment record found' });
+      return NextResponse.json({ status: 'error', error: 'No payment record found for this order' });
     }
 
-    const razorpayPaymentId = paidPayment.id;
-
-    // Compute the signature server-side (we have the key secret)
-    const computedSignature = computeSignature(razorpayOrderId, razorpayPaymentId);
-
-    // Verify the computed signature against what Razorpay would expect
-    const isValid = computeSignature(razorpayOrderId, razorpayPaymentId) === computedSignature;
-    if (!isValid) {
-      // This should never happen since we computed it ourselves, but just in case
-      return NextResponse.json({ status: 'error', error: 'Signature computation failed' });
-    }
-
-    // Confirm the booking
-    const result = await confirmBooking(bookingId, razorpayOrderId, razorpayPaymentId);
+    console.log(`[Status] Confirming booking ${bookingId} with payment ${paidPayment.id}`);
+    const result = await confirmBooking(bookingId, razorpayOrderId, paidPayment.id);
 
     if (!result.success) {
-      return NextResponse.json({ status: 'verify_failed', error: result.error || 'Booking confirmation failed' });
+      console.error(`[Status] confirmBooking failed for ${bookingId}:`, result.error);
+      return NextResponse.json({ status: 'error', error: result.error || 'Booking confirmation failed' });
     }
 
+    console.log(`[Status] Booking ${bookingId} confirmed with serial ${result.serial_number}`);
     return NextResponse.json({
       status: 'confirmed',
       booking_id: bookingId,
       serial_number: result.serial_number,
     });
   } catch (err: any) {
-    console.error('[API /razorpay/status] error:', err?.message || err);
+    console.error('[Status] Unhandled error:', err?.message || err);
     return NextResponse.json({ status: 'error', error: 'Failed to check payment status' });
   }
 }
