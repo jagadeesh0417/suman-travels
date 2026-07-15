@@ -256,6 +256,14 @@ export async function confirmBooking(
       }
     })();
 
+    // Fire-and-forget: notify revalidation endpoint so admin pages refresh
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    fetch(`${baseUrl}/api/revalidate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_id, serial_number: serialNumber }),
+    }).catch(() => {});
+
     return { success: true, serial_number: serialNumber };
   } catch (e) {
     try { await tx.rollback(); } catch {}

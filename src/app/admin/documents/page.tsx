@@ -10,11 +10,14 @@ interface DateFile {
 export default function AdminDocuments() {
   const [files, setFiles] = useState<DateFile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
-  const loadFiles = useCallback(async () => {
+  const loadFiles = useCallback(async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
+    else setRefreshing(true);
     try {
-      const res = await fetch('/api/documents', { cache: 'no-store' });
+      const res = await fetch(`/api/documents?_t=${Date.now()}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setFiles(data);
@@ -23,25 +26,28 @@ export default function AdminDocuments() {
       // silent
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
     loadFiles();
-    // Auto-refresh every 15 seconds
-    intervalRef.current = setInterval(loadFiles, 15000);
-    // Refresh on page focus (admin returns to tab)
-    const onFocus = () => { loadFiles(); };
-    window.addEventListener('focus', onFocus);
+    // Aggressive polling every 5 seconds
+    intervalRef.current = setInterval(() => loadFiles(true), 5000);
+    // Refresh when tab becomes visible again
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') loadFiles(true);
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       clearInterval(intervalRef.current);
-      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [loadFiles]);
 
   const handleDownload = async (date: string) => {
     try {
-      const res = await fetch(`/api/documents?download=${date}`, { cache: 'no-store' });
+      const res = await fetch(`/api/documents?download=${date}&_t=${Date.now()}`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Document not found');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -62,9 +68,14 @@ export default function AdminDocuments() {
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
-        <h1 className="text-2xl font-bold text-[#1e3a5f]">Date-wise Reports</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-[#1e3a5f]">Date-wise Reports</h1>
+          {refreshing && (
+            <div className="w-4 h-4 border-2 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+          )}
+        </div>
         <button
-          onClick={loadFiles}
+          onClick={() => loadFiles()}
           className="px-4 py-2 text-sm font-medium text-[#1e3a5f] bg-[#1e3a5f]/5 rounded-lg hover:bg-[#1e3a5f]/10 transition-colors flex items-center gap-2 self-start"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -74,7 +85,7 @@ export default function AdminDocuments() {
         </button>
       </div>
       <p className="text-gray-500 mb-6">
-        One Excel file per travel date, grouped by Exam Center and Slot. Auto-refreshes every 15 seconds.
+        One Excel file per travel date, grouped by Exam Center and Slot. Auto-refreshes every 5 seconds.
       </p>
 
       <div className="glass-card overflow-hidden">
