@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { dbExecute, rowToObject } from '@/lib/db';
-import { createOrder } from '@/lib/razorpay';
+import { createOrder, assertRazorpayEnv } from '@/lib/razorpay';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    assertRazorpayEnv();
+
     const { booking_id } = await request.json();
 
     if (!booking_id) {
@@ -41,10 +46,24 @@ export async function POST(request: NextRequest) {
     );
     const primaryPassenger = (passengersResult.rows[0] || {}) as any;
 
+    // Generate receipt token — unguessable, used to authorise receipt download
+    const receiptToken = crypto.randomBytes(24).toString('hex');
+
     await dbExecute(
-      `UPDATE bookings SET razorpay_order_id = ?, customer_name = ?, customer_mobile = ? WHERE booking_id = ?`,
-      [order.id, primaryPassenger.name || '', primaryPassenger.mobile || '', booking_id]
+      `UPDATE bookings SET razorpay_order_id = ?, customer_name = ?, customer_mobile = ?, receipt_token = ? WHERE booking_id = ?`,
+      [order.id, primaryPassenger.name || '', primaryPassenger.mobile || '', receiptToken, booking_id]
     );
+
+    // Log payment event
+    try {
+      await dbExecute(
+        `INSERT INTO payment_events (razorpay_order_id, razorpay_payment_id, event, status, amount, booking_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
+        [order.id, '', 'order_created', 'created', Math.round(amount * 100), booking_id]
+      );
+    } catch (e: any) {
+      console.error('[create-order] logPaymentEvent error:', e?.message || e);
+    }
 
     return NextResponse.json({
       success: true,
@@ -54,9 +73,20 @@ export async function POST(request: NextRequest) {
       key_id: process.env.RAZORPAY_KEY_ID || '',
       customer_name: primaryPassenger.name || 'Customer',
       customer_mobile: primaryPassenger.mobile || '',
+      receipt_token: receiptToken,
+      booking_id,
     });
   } catch (err: any) {
-    console.error('[API /razorpay/create-order] error:', err?.message || err);
-    return NextResponse.json({ error: 'Failed to create payment order' }, { status: 500 });
+    console.error('[create-order] Error:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
+    // Razorpay SDK errors carry structured fields — surface them
+    const statusCode = err.statusCode || 500;
+    const description = err.error?.description || err.message || 'Failed to create payment order';
+    const code = err.error?.code;
+    const field = err.error?.field;
+    return NextResponse.json({
+      error: description,
+      ...(code ? { code } : {}),
+      ...(field ? { field } : {}),
+    }, { status: statusCode });
   }
 }

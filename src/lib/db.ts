@@ -392,6 +392,14 @@ async function ensureSchema(): Promise<void> {
     await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN razorpay_bank_ref TEXT DEFAULT ''" });
   } catch {
   }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN receipt_token TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "CREATE INDEX IF NOT EXISTS idx_bookings_receipt_token ON bookings(receipt_token)" });
+  } catch {
+  }
 
   const defaultSettings: Record<string, string> = {
     upi_id: '9848579053@paytm',

@@ -9,7 +9,8 @@ export function assertRazorpayEnv(): void {
   const missing: string[] = [];
   if (!process.env.RAZORPAY_KEY_ID) missing.push('RAZORPAY_KEY_ID');
   if (!process.env.RAZORPAY_KEY_SECRET) missing.push('RAZORPAY_KEY_SECRET');
-  if (!process.env.RAZORPAY_WEBHOOK_SECRET) missing.push('RAZORPAY_WEBHOOK_SECRET');
+  // RAZORPAY_WEBHOOK_SECRET intentionally NOT checked here —
+  // order creation must work before any webhook is configured.
   if (missing.length > 0) {
     throw new Error(`Missing required Razorpay env vars: ${missing.join(', ')}`);
   }
@@ -22,6 +23,16 @@ export function assertRazorpayEnv(): void {
   }
   console.log(`[Razorpay] ${modeLive ? 'LIVE' : 'TEST'} mode, key_id=${keyId.slice(0, 12)}...`);
   envAsserted = true;
+}
+
+/**
+ * Verify webhook secret exists. Called inside the webhook handler only.
+ * Order creation must never depend on this.
+ */
+export function assertWebhookSecret(): void {
+  if (!process.env.RAZORPAY_WEBHOOK_SECRET) {
+    throw new Error('RAZORPAY_WEBHOOK_SECRET is not configured. Set it in Vercel env and configure the webhook in Razorpay dashboard.');
+  }
 }
 
 function getRazorpay(): Razorpay {
