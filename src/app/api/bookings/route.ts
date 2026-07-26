@@ -82,9 +82,9 @@ export async function POST(request: Request) {
       }
     }
 
-    const slotResult = await dbExecute('SELECT * FROM slots WHERE id = ? AND enabled = 1', [slot_id]);
+    const slotResult = await dbExecute("SELECT * FROM slots WHERE id = ? AND enabled = 1 AND status = 'active'", [slot_id]);
     if (slotResult.rows.length === 0) {
-      return NextResponse.json({ error: 'Slot not found or disabled' }, { status: 400 });
+      return NextResponse.json({ error: 'This exam slot has expired. Please choose another available slot.' }, { status: 400 });
     }
 
     const priceResult = await dbExecute("SELECT value FROM settings WHERE key = 'price_per_ticket'");

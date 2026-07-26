@@ -324,6 +324,19 @@ async function ensureSchema(): Promise<void> {
     )`,
     'CREATE INDEX IF NOT EXISTS idx_payment_events_order ON payment_events(razorpay_order_id)',
     'CREATE INDEX IF NOT EXISTS idx_payment_events_booking ON payment_events(booking_id)',
+    `CREATE TABLE IF NOT EXISTS slots_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      original_id INTEGER NOT NULL,
+      date_id INTEGER NOT NULL,
+      time TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      vehicle_time TEXT DEFAULT '',
+      expiry_days INTEGER DEFAULT 3,
+      expires_at TEXT DEFAULT '',
+      date TEXT DEFAULT '',
+      archived_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    'CREATE INDEX IF NOT EXISTS idx_slots_history_date ON slots_history(date)',
     'CREATE UNIQUE INDEX IF NOT EXISTS idx_slots_date_id_time ON slots(date_id, time)',
     'CREATE INDEX IF NOT EXISTS idx_slots_date_id ON slots(date_id)',
     'CREATE INDEX IF NOT EXISTS idx_bookings_booking_id ON bookings(booking_id)',
@@ -403,6 +416,22 @@ async function ensureSchema(): Promise<void> {
     await client.execute({ sql: "CREATE INDEX IF NOT EXISTS idx_bookings_receipt_token ON bookings(receipt_token)" });
   } catch {
   }
+  try {
+    await client.execute({ sql: "ALTER TABLE slots ADD COLUMN expiry_days INTEGER DEFAULT 3" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE slots ADD COLUMN expires_at TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE slots ADD COLUMN status TEXT DEFAULT 'active'" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "CREATE INDEX IF NOT EXISTS idx_slots_status ON slots(status)" });
+  } catch {
+  }
 
   const defaultSettings: Record<string, string> = {
     upi_id: '9848579053@paytm',
@@ -411,6 +440,7 @@ async function ensureSchema(): Promise<void> {
     business_name: 'Suman Travels',
     business_phone: '+91 9010532226',
     business_address: 'Lalitha Nagar, NGO Colony, Nandyala, Andhra Pradesh – 518502',
+    slot_expiry_days: '3',
   };
 
   for (const [key, value] of Object.entries(defaultSettings)) {

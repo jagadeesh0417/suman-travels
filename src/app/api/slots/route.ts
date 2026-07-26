@@ -2,20 +2,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { dbExecute, rowsToObjects } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
 import { cleanupExpiredDates } from '@/lib/cleanup';
+import { expireSlots } from '@/lib/expiry';
 
 export async function GET(request: NextRequest) {
   try {
     await cleanupExpiredDates();
+    await expireSlots();
     const { searchParams } = new URL(request.url);
     const dateId = searchParams.get('date_id');
 
     let result;
     if (dateId) {
-      result = await dbExecute('SELECT * FROM slots WHERE date_id = ? ORDER BY time ASC', [Number(dateId)]);
-    } else {
+      // Public / book-page query — only active slots
       result = await dbExecute(
-        `SELECT s.*, d.date FROM slots s 
-         JOIN dates d ON s.date_id = d.id 
+        "SELECT * FROM slots WHERE date_id = ? AND status = 'active' AND enabled = 1 ORDER BY time ASC",
+        [Number(dateId)]
+      );
+    } else {
+      // Admin query — all slots with their date
+      result = await dbExecute(
+        `SELECT s.*, d.date FROM slots s
+         JOIN dates d ON s.date_id = d.id
          ORDER BY d.date DESC, s.time ASC`
       );
     }

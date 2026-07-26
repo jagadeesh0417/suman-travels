@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { dbExecute, rowToObject } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
 import { cleanupExpiredDates } from '@/lib/cleanup';
+import { expireSlots } from '@/lib/expiry';
 
 export async function GET() {
   const email = await getAdminSession();
@@ -9,16 +10,20 @@ export async function GET() {
 
   try {
     await cleanupExpiredDates();
-    const [totalBookings, totalPayments, activeSlots, revenue, pendingBookings, totalPassengers, totalDates, availableSeats] =
+    await expireSlots();
+
+    const [totalBookings, totalPayments, activeSlots, revenue, pendingBookings, totalPassengers, totalDates, availableSeats, upcomingSlots, expiredSlots] =
       await Promise.all([
         dbExecute("SELECT COUNT(*) as cnt FROM bookings WHERE payment_status = 'confirmed'"),
         dbExecute("SELECT COALESCE(SUM(amount), 0) as total FROM bookings WHERE payment_status = 'confirmed'"),
-        dbExecute('SELECT COUNT(*) as cnt FROM slots WHERE enabled = 1'),
+        dbExecute("SELECT COUNT(*) as cnt FROM slots WHERE status = 'active' AND enabled = 1"),
         dbExecute("SELECT COALESCE(SUM(amount), 0) as total FROM bookings WHERE payment_status = 'confirmed'"),
         dbExecute("SELECT COUNT(*) as cnt FROM bookings WHERE payment_status = 'pending'"),
         dbExecute('SELECT COUNT(*) as cnt FROM passengers'),
         dbExecute('SELECT COUNT(*) as cnt FROM dates'),
         dbExecute("SELECT COALESCE(SUM(passenger_count), 0) as taken FROM bookings WHERE payment_status = 'confirmed'"),
+        dbExecute("SELECT COUNT(*) as cnt FROM slots WHERE status = 'active' AND enabled = 1"),
+        dbExecute("SELECT COUNT(*) as cnt FROM slots WHERE status = 'expired'"),
       ]);
 
     return NextResponse.json({
@@ -30,6 +35,8 @@ export async function GET() {
       totalPassengers: Number(rowToObject(totalPassengers)?.cnt || 0),
       totalDates: Number(rowToObject(totalDates)?.cnt || 0),
       availableSeats: Number(rowToObject(availableSeats)?.taken || 0),
+      upcomingSlots: Number(rowToObject(upcomingSlots)?.cnt || 0),
+      expiredSlots: Number(rowToObject(expiredSlots)?.cnt || 0),
     });
   } catch (err: any) {
     console.error('[API /admin/stats] GET error:', err?.message || err);

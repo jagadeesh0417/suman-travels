@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { dbExecute, rowsToObjects, getDb } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
 import { cleanupExpiredDates } from '@/lib/cleanup';
+import { expireSlots, calcExpiresAt } from '@/lib/expiry';
 
 export async function GET() {
   try {
     await cleanupExpiredDates();
+    await expireSlots();
     const result = await dbExecute('SELECT * FROM dates ORDER BY date DESC');
     return NextResponse.json(rowsToObjects(result));
   } catch (err: any) {
@@ -27,6 +29,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Date already exists' }, { status: 400 });
     }
 
+    const expiryRow = await dbExecute("SELECT value FROM settings WHERE key = 'slot_expiry_days'");
+    const expiryDays = Number((expiryRow.rows[0] as any)?.value || 3);
+    const expiresAt = expiryDays > 0 ? calcExpiresAt(date, expiryDays) : '';
+
     const db = await getDb();
     const tx = await db.transaction('write');
 
@@ -45,8 +51,8 @@ export async function POST(request: Request) {
         });
         if (existing.rows.length === 0) {
           await tx.execute({
-            sql: 'INSERT INTO slots (date_id, time, enabled, vehicle_time) VALUES (?, ?, 1, ?)',
-            args: [dateId, time, ''],
+            sql: "INSERT INTO slots (date_id, time, enabled, vehicle_time, expiry_days, expires_at, status) VALUES (?, ?, 1, ?, ?, ?, 'active')",
+            args: [dateId, time, '', expiryDays, expiresAt],
           });
         }
       }
@@ -72,6 +78,12 @@ export async function PUT(request: Request) {
     if (!id || !date) return NextResponse.json({ error: 'ID and date are required' }, { status: 400 });
 
     await dbExecute('UPDATE dates SET date = ? WHERE id = ?', [date, id]);
+
+    const expiryRow = await dbExecute("SELECT value FROM settings WHERE key = 'slot_expiry_days'");
+    const expiryDays = Number((expiryRow.rows[0] as any)?.value || 3);
+    const expiresAt = expiryDays > 0 ? calcExpiresAt(date, expiryDays) : '';
+    await dbExecute("UPDATE slots SET expires_at = ? WHERE date_id = ? AND status = 'active'", [expiresAt, id]);
+
     return NextResponse.json({ message: 'Date updated' });
   } catch (err: any) {
     console.error('[API /dates] PUT error:', err?.message || err);
@@ -101,11 +113,8 @@ export async function DELETE(request: NextRequest) {
     const tx = await db.transaction('write');
 
     try {
-      // Delete all slots for this date
       await tx.execute({ sql: 'DELETE FROM slots WHERE date_id = ?', args: [dateId] });
-      // Delete non-confirmed bookings (they can't exist without slots)
       await tx.execute({ sql: "DELETE FROM bookings WHERE date_id = ? AND payment_status != 'confirmed'", args: [dateId] });
-      // Keep the date row so confirmed bookings' FK constraints remain valid
       await tx.commit();
       return NextResponse.json({ message: 'Date slots deleted. Confirmed bookings preserved.' });
     } catch (e) {
