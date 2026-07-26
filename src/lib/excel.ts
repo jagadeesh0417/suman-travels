@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import { slotLabel } from './slots';
+import { getISTComponents, getTimestampISTComponents, getISTNow } from './dates';
 
 export interface BookingRow {
   booking_id: string;
@@ -43,22 +44,22 @@ const HEADER_COLUMNS = [
 const COL_WIDTHS = [10, 14, 22, 16, 10, 36, 16, 18, 12, 14, 16, 24, 24, 24, 20];
 
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yyyy = d.getFullYear();
+  const { dd, mm, yyyy } = getISTComponents(dateStr);
   return `${dd}-${mm}-${yyyy}`;
 }
 
 function formatDateTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const { dd, mm, yyyy } = getTimestampISTComponents(dateStr);
+  const d = new Date(dateStr.replace(' ', 'T') + 'Z');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthShort = months[parseInt(mm, 10) - 1] || mm;
+  const hours = d.getUTCHours() + 5;
+  const minutes = d.getUTCMinutes() + 30;
+  const h = hours % 24;
+  const m = minutes % 60;
+  const hh = String(h).padStart(2, '0');
+  const mi = String(m).padStart(2, '0');
+  return `${dd}-${monthShort}-${yyyy} ${hh}:${mi}`;
 }
 
 export async function generateDateExcel(
@@ -67,7 +68,7 @@ export async function generateDateExcel(
 ): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Suman Travels';
-  workbook.created = new Date();
+  workbook.created = getISTNow();
 
   const ws = workbook.addWorksheet(formatDate(dateStr), {
     pageSetup: { orientation: 'landscape', fitToPage: true },
@@ -170,7 +171,7 @@ export async function generateAllDatesExcel(
 ): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Suman Travels';
-  workbook.created = new Date();
+  workbook.created = getISTNow();
 
   for (const [dateStr, bookings] of Object.entries(dateGroups)) {
     const ws = workbook.addWorksheet(formatDate(dateStr), {

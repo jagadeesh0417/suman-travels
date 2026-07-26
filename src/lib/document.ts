@@ -16,6 +16,7 @@ import {
   TableLayoutType,
 } from 'docx';
 import { to12h } from './slots';
+import { formatDateOnly } from './dates';
 
 const BUSINESS_NAME = 'SUMAN TRAVELS';
 const PHONE = '+91 9010532226';
@@ -292,7 +293,7 @@ export async function generateBookingDocument(
             children: [
               new TextRun({ text: `Booking Date: `, bold: true, size: 20 }),
               new TextRun({
-                text: `${new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}`,
+                text: formatDateOnly(new Date().toISOString().slice(0, 10), { year: 'numeric', month: 'long', day: 'numeric' }),
                 size: 20,
               }),
             ],

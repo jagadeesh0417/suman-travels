@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { formatDateOnly, formatTimestamp } from './dates';
 
 export function generateBookingId(): string {
   const prefix = 'ST';
@@ -7,7 +8,7 @@ export function generateBookingId(): string {
 }
 
 export function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('en-IN', {
+  return formatDateOnly(date, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -22,7 +23,7 @@ export function formatCurrency(amount: number): string {
 }
 
 export function formatDateTime(date: string): string {
-  return new Date(date).toLocaleString('en-IN', {
+  return formatTimestamp(date, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

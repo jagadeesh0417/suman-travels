@@ -4,6 +4,7 @@ import { useEffect, useState, use, useRef } from 'react';
 import Link from 'next/link';
 import { slotLabel, to12h } from '@/lib/slots';
 import LoadingButton from '@/components/ui/LoadingButton';
+import { getISTComponents } from '@/lib/dates';
 
 interface BookingData {
   booking_id: string;
@@ -58,10 +59,7 @@ export default function SuccessPage({
       if (!res.ok) throw new Error('Document not found');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const dateObj = new Date(booking.date);
-      const dd = String(dateObj.getDate()).padStart(2, '0');
-      const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const yyyy = dateObj.getFullYear();
+      const { dd, mm, yyyy } = getISTComponents(booking.date);
       const a = document.createElement('a');
       a.href = url;
       a.download = `${dd}-${mm}-${yyyy}.xlsx`;

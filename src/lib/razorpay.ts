@@ -1,5 +1,6 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
+import { toISTISOString } from './dates';
 
 let razorpayInstance: Razorpay | null = null;
 let envAsserted = false;
@@ -305,7 +306,7 @@ export async function confirmBooking(
             razorpay_order_id,
             bank_ref: paymentDetails.bank_transaction_id || '',
             payment_status: 'confirmed',
-            booking_time: new Date().toISOString(),
+            booking_time: toISTISOString(),
           });
         }
       } catch (gsErr: any) {

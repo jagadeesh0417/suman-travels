@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { slotLabel } from '@/lib/slots';
 import LoadingButton from '@/components/ui/LoadingButton';
+import { formatTimestamp } from '@/lib/dates';
 
 interface Passenger {
   name: string;
@@ -180,7 +181,7 @@ export default function DownloadTicketPage() {
                 <div className="flex justify-between py-2">
                   <span className="text-gray-500">Booked On</span>
                   <span className="text-sm text-gray-600">
-                    {new Date(booking.created_at).toLocaleString('en-IN')}
+                    {formatTimestamp(booking.created_at)}
                   </span>
                 </div>
               </div>

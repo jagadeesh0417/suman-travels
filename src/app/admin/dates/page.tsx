@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import LoadingButton from '@/components/ui/LoadingButton';
+import { formatDateOnly, formatWeekday } from '@/lib/dates';
 
 interface DateRecord {
   id: number;
@@ -158,16 +159,12 @@ export default function AdminDates() {
                       </form>
                     ) : (
                       <span className="font-medium text-gray-900">
-                        {new Date(d.date).toLocaleDateString('en-IN', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })}
+                        {formatDateOnly(d.date, { year: 'numeric', month: 'long', day: 'numeric' })}
                       </span>
                     )}
                   </td>
                   <td className="p-4 text-gray-500">
-                    {new Date(d.date).toLocaleDateString('en-IN', { weekday: 'long' })}
+                    {formatWeekday(d.date)}
                   </td>
                   <td className="p-4">
                     <div className="flex justify-end gap-2">

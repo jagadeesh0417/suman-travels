@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { slotLabel } from '@/lib/slots';
+import { formatDateOnly, formatShortTimestamp } from '@/lib/dates';
 
 interface BookingRecord {
   booking_id: string;
@@ -116,7 +117,7 @@ export default function AdminBookings() {
                     <td className="p-3 whitespace-nowrap font-mono text-sm text-gray-600">{mobile || '-'}</td>
                     <td className="p-3 whitespace-nowrap text-sm text-gray-600">{b.customer_email || '-'}</td>
                     <td className="p-3 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(b.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {formatDateOnly(b.date, { day: 'numeric', month: 'short', year: 'numeric' })}
                     </td>
                     <td className="p-3 whitespace-nowrap text-sm text-gray-700">{slotLabel(b.time)}</td>
                     <td className="p-3 whitespace-nowrap text-sm text-gray-600 max-w-[180px] truncate" title={b.exam_center || ''}>
@@ -144,7 +145,7 @@ export default function AdminBookings() {
                       {b.razorpay_bank_ref || b.utr_number || '-'}
                     </td>
                     <td className="p-3 whitespace-nowrap text-xs text-gray-500">
-                      {new Date(b.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      {formatShortTimestamp(b.created_at)}
                     </td>
                     <td className="p-3 text-right whitespace-nowrap">
                       <Link

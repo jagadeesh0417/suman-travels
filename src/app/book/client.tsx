@@ -7,6 +7,7 @@ import 'react-day-picker/style.css';
 import { format } from 'date-fns';
 import { slotLabel, to12h, EXAM_CENTERS } from '@/lib/slots';
 import LoadingButton from '@/components/ui/LoadingButton';
+import { formatDateOnly, formatLongDate } from '@/lib/dates';
 
 interface DateOption {
   id: number;
@@ -71,15 +72,16 @@ function CalendarWidget({
   onSelect: (dateId: number) => void;
 }) {
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const todayIST = new Date(todayStr + 'T00:00:00+05:30');
 
   const availableDatesSet = new Set(availableDates.map((d) => d.date));
 
   const selectedDate = availableDates.find((d) => d.id === selectedDateId);
-  const selectedDateObj = selectedDate ? new Date(selectedDate.date) : null;
+  const selectedDateObj = selectedDate ? new Date(selectedDate.date + 'T00:00:00+05:30') : null;
 
   const disabledDays = [
-    { before: today },
+    { before: todayIST },
     (day: Date) => {
       const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
       return !availableDatesSet.has(key);
@@ -96,7 +98,7 @@ function CalendarWidget({
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-500">Selected</span>
             <span className="font-bold text-[#1e3a5f]">
-              {format(selectedDateObj, 'dd MMMM yyyy')}
+              {format(selectedDateObj, 'dd MMMM yyyy', { in: 'Asia/Kolkata' } as any)}
             </span>
           </div>
         </div>
@@ -135,8 +137,10 @@ function StepSelectSlot({
     fetch('/api/dates')
       .then((r) => r.json())
       .then((data) => {
+        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        const todayIST = new Date(todayStr + 'T00:00:00+05:30');
         const futureDates = (data as DateOption[]).filter(
-          (d) => new Date(d.date) >= new Date(new Date().toDateString())
+          (d) => new Date(d.date + 'T00:00:00+05:30') >= todayIST
         );
         setDates(futureDates);
         setLoading(false);
@@ -747,14 +751,7 @@ export default function BookPageClient() {
     const dates = await datesRes.json();
     const dateObj = dates.find((d: any) => d.id === dateId);
     if (dateObj) {
-      setSelectedDateStr(
-        new Date(dateObj.date).toLocaleDateString('en-IN', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })
-      );
+      setSelectedDateStr(formatLongDate(dateObj.date));
     }
 
     const slotsRes = await fetch(`/api/slots?date_id=${dateId}`);

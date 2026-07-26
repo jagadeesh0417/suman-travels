@@ -4,6 +4,7 @@ import { useEffect, useState, use, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import LoadingButton from '@/components/ui/LoadingButton';
+import { getISTComponents } from '@/lib/dates';
 
 interface BookingStatus {
   status: string;
@@ -109,7 +110,7 @@ export default function BookingStatusPage({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Receipt-${bookingId}.docx`;
+      a.download = `Receipt-${bookingId}.docx`; // Download filename does not need IST conversion
       a.click();
       URL.revokeObjectURL(url);
       fireEvent(bookingId, 'receipt_downloaded', '');

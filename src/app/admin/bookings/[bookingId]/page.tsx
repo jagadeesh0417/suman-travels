@@ -4,6 +4,7 @@ import { useEffect, useState, use, useCallback } from 'react';
 import Link from 'next/link';
 import { slotLabel } from '@/lib/slots';
 import LoadingButton from '@/components/ui/LoadingButton';
+import { formatTimestamp } from '@/lib/dates';
 
 interface Passenger {
   name: string;
@@ -204,14 +205,14 @@ export default function BookingDetailPage({
               <div className="flex justify-between">
                 <span className="text-gray-500">Payment Time</span>
                 <span className="text-sm text-gray-600">
-                  {new Date(booking.payment_timestamp).toLocaleString('en-IN')}
+                    {formatTimestamp(booking.payment_timestamp)}
                 </span>
               </div>
             )}
             <div className="flex justify-between">
               <span className="text-gray-500">Booked On</span>
               <span className="text-sm text-gray-600">
-                {new Date(booking.created_at).toLocaleString('en-IN')}
+                    {formatTimestamp(booking.created_at)}
               </span>
             </div>
           </div>

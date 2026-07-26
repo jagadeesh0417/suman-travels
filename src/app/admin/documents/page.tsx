@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import LoadingButton from '@/components/ui/LoadingButton';
+import { getISTComponents, formatDateOnly } from '@/lib/dates';
 
 interface DateFile {
   date: string;
@@ -55,10 +56,7 @@ export default function AdminDocuments() {
       if (!res.ok) throw new Error('Document not found');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const dateObj = new Date(date);
-      const dd = String(dateObj.getDate()).padStart(2, '0');
-      const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const yyyy = dateObj.getFullYear();
+      const { dd, mm, yyyy } = getISTComponents(date);
       const a = document.createElement('a');
       a.href = url;
       a.download = `${dd}-${mm}-${yyyy}.xlsx`;
@@ -113,16 +111,8 @@ export default function AdminDocuments() {
         ) : (
           <div className="divide-y divide-gray-100">
             {files.map((f) => {
-              const dateObj = new Date(f.date);
-              const dd = String(dateObj.getDate()).padStart(2, '0');
-              const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-              const yyyy = dateObj.getFullYear();
-              const label = dateObj.toLocaleDateString('en-IN', {
-                weekday: 'short',
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-              });
+              const { dd, mm, yyyy } = getISTComponents(f.date);
+              const label = formatDateOnly(f.date, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
 
               return (
                 <div

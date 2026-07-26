@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { EXAM_TIMINGS } from '@/lib/slots';
 import LoadingButton from '@/components/ui/LoadingButton';
+import { formatDateOnly } from '@/lib/dates';
 
 interface SlotRecord {
   id: number;
@@ -116,12 +117,7 @@ export default function AdminSlots() {
           <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
             <h2 className="font-bold text-[#1e3a5f]">
               {group.date
-                ? new Date(group.date).toLocaleDateString('en-IN', {
-                    weekday: 'short',
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                  })
+                ? formatDateOnly(group.date, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
                 : `Date #${group.date_id}`}
             </h2>
           </div>
