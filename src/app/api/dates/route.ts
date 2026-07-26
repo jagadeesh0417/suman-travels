@@ -23,20 +23,40 @@ export async function POST(request: Request) {
     if (!date) return NextResponse.json({ error: 'Date is required' }, { status: 400 });
 
     const existing = await dbExecute('SELECT id FROM dates WHERE date = ?', [date]);
-    if (existing.rows.length > 0) return NextResponse.json({ error: 'Date already exists' }, { status: 400 });
-
-    const result = await dbExecute('INSERT INTO dates (date) VALUES (?)', [date]);
-    const dateId = Number(result.lastInsertRowid);
-
-    const timings = ['07:30', '10:30', '13:00', '15:30'];
-    for (const time of timings) {
-      const existing = await dbExecute('SELECT id FROM slots WHERE date_id = ? AND time = ?', [dateId, time]);
-      if (existing.rows.length === 0) {
-        await dbExecute('INSERT INTO slots (date_id, time, enabled, vehicle_time) VALUES (?, ?, 1, ?)', [dateId, time, '']);
-      }
+    if (existing.rows.length > 0) {
+      return NextResponse.json({ error: 'Date already exists' }, { status: 400 });
     }
 
-    return NextResponse.json({ id: dateId, date }, { status: 201 });
+    const db = await getDb();
+    const tx = await db.transaction('write');
+
+    try {
+      const insertResult = await tx.execute({
+        sql: 'INSERT INTO dates (date) VALUES (?)',
+        args: [date],
+      });
+      const dateId = Number(insertResult.lastInsertRowid);
+
+      const timings = ['07:30', '10:30', '13:00', '15:30'];
+      for (const time of timings) {
+        const existing = await tx.execute({
+          sql: 'SELECT id FROM slots WHERE date_id = ? AND time = ?',
+          args: [dateId, time],
+        });
+        if (existing.rows.length === 0) {
+          await tx.execute({
+            sql: 'INSERT INTO slots (date_id, time, enabled, vehicle_time) VALUES (?, ?, 1, ?)',
+            args: [dateId, time, ''],
+          });
+        }
+      }
+
+      await tx.commit();
+      return NextResponse.json({ id: dateId, date }, { status: 201 });
+    } catch (e) {
+      await tx.rollback();
+      throw e;
+    }
   } catch (err: any) {
     console.error('[API /dates] POST error:', err?.message || err);
     return NextResponse.json({ error: 'Failed to create date' }, { status: 500 });
