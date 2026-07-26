@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { EXAM_TIMINGS } from '@/lib/slots';
+import LoadingButton from '@/components/ui/LoadingButton';
 
 interface SlotRecord {
   id: number;
@@ -87,7 +88,7 @@ export default function AdminSlots() {
         </div>
       )}
 
-      <button
+      <LoadingButton
         onClick={async () => {
           setGenerating(true);
           try {
@@ -96,11 +97,13 @@ export default function AdminSlots() {
           } catch {}
           setGenerating(false);
         }}
-        disabled={generating}
-        className="btn-primary mb-6"
+        loading={generating}
+        loadingText="Generating..."
+        variant="primary"
+        className="mb-6"
       >
-        {generating ? 'Generating...' : 'Generate Missing Slots for All Dates'}
-      </button>
+        Generate Missing Slots for All Dates
+      </LoadingButton>
 
       {sorted.length === 0 && !generating && (
         <div className="glass-card p-12 text-center">
@@ -152,13 +155,15 @@ export default function AdminSlots() {
                           }
                           className="input-field !py-1.5 !text-sm !w-32"
                         />
-                        <button
+                        <LoadingButton
                           type="submit"
-                          disabled={savingVehicle[slot.id]}
-                          className="px-3 py-1.5 bg-[#1e3a5f] text-white rounded-lg text-xs font-semibold hover:bg-[#2a4f7f] transition-colors shadow-sm disabled:opacity-50"
+                          loading={savingVehicle[slot.id]}
+                          loadingText="Saving..."
+                          variant="primary"
+                          className="!px-3 !py-1.5 !text-xs !rounded-lg"
                         >
-                          {savingVehicle[slot.id] ? '...' : 'Save'}
-                        </button>
+                          Save
+                        </LoadingButton>
                       </form>
 
                       <button

@@ -180,3 +180,46 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* Loading Spinner */
+.spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.spinner-lg {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-width: 3px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Loading button state */
+button:where(:disabled),
+.btn-loading {
+  cursor: not-allowed;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Cursor wait on body during loading */
+body.loading-active {
+  cursor: wait !important;
+}
+body.loading-active * {
+  pointer-events: none !important;
+}
+body.loading-active input,
+body.loading-active select,
+body.loading-active textarea,
+body.loading-active button {
+  opacity: 0.6;
+}

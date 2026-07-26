@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, use } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { slotLabel } from '@/lib/slots';
+import LoadingButton from '@/components/ui/LoadingButton';
 
 interface Passenger {
   name: string;
@@ -34,10 +35,12 @@ export default function DownloadTicketPage() {
   const [booking, setBooking] = useState<BookingData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const lookupBusyRef = useRef(false);
 
   const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bookingId.trim() || !mobile.trim()) return;
+    if (!bookingId.trim() || !mobile.trim() || lookupBusyRef.current) return;
+    lookupBusyRef.current = true;
     setLoading(true);
     setError('');
     setBooking(null);
@@ -48,6 +51,7 @@ export default function DownloadTicketPage() {
         const err = await res.json().catch(() => ({ error: 'Booking not found' }));
         setError(err.error || 'Booking not found. Please check your Booking ID and Mobile number.');
         setLoading(false);
+        lookupBusyRef.current = false;
         return;
       }
       const data = await res.json();
@@ -56,6 +60,7 @@ export default function DownloadTicketPage() {
       setError('Failed to look up booking. Please try again.');
     }
     setLoading(false);
+    lookupBusyRef.current = false;
   };
 
   return (
@@ -92,13 +97,15 @@ export default function DownloadTicketPage() {
                 required
               />
             </div>
-            <button
+            <LoadingButton
               type="submit"
-              disabled={loading}
-              className="btn-primary w-full justify-center"
+              loading={loading}
+              loadingText="Searching..."
+              variant="primary"
+              className="w-full justify-center"
             >
-              {loading ? 'Searching...' : 'Get Ticket'}
-            </button>
+              Get Ticket
+            </LoadingButton>
           </div>
         </form>
 

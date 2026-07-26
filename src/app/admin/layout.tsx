@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -18,6 +18,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const logoutRef = useRef(false);
 
   // Close sidebar on mobile after navigation
   useEffect(() => {
@@ -40,6 +42,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [router, pathname]);
 
   const handleLogout = async () => {
+    if (logoutRef.current) return;
+    logoutRef.current = true;
+    setLoggingOut(true);
     setSidebarOpen(false);
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/admin');
@@ -121,12 +126,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Link>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white transition-all w-full"
+            disabled={loggingOut}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all w-full ${
+              loggingOut
+                ? 'text-gray-500 cursor-wait'
+                : 'text-gray-300 hover:bg-white/5 hover:text-white'
+            }`}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            Logout
+            {loggingOut ? (
+              <>
+                <span className="spinner !border-gray-400 !border-r-transparent shrink-0" />
+                Logging out...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Logout
+              </>
+            )}
           </button>
         </div>
       </aside>

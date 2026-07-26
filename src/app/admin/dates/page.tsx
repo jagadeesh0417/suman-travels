@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import LoadingButton from '@/components/ui/LoadingButton';
 
 interface DateRecord {
   id: number;
@@ -115,9 +116,9 @@ export default function AdminDates() {
             className="input-field flex-1"
             required
           />
-          <button type="submit" className="btn-primary" disabled={submitting}>
-            {submitting ? 'Adding...' : 'Add Date'}
-          </button>
+          <LoadingButton type="submit" loading={submitting} loadingText="Adding..." variant="primary">
+            Add Date
+          </LoadingButton>
         </div>
         <p className="text-xs text-gray-400 mt-2">
           4 exam slots (07:30 AM, 10:30 AM, 01:00 PM, 03:30 PM) will be auto-created for this date.
@@ -172,13 +173,15 @@ export default function AdminDates() {
                     <div className="flex justify-end gap-2">
                       {editId === d.id ? (
                         <>
-                          <button
+                          <LoadingButton
                             onClick={() => handleUpdate(d.id)}
-                            disabled={submitting}
-                            className="px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-sm font-medium hover:bg-green-100 transition-colors disabled:opacity-50"
+                            loading={submitting}
+                            loadingText="Saving..."
+                            variant="ghost"
+                            className="bg-green-50 text-green-600 hover:bg-green-100"
                           >
-                            {submitting ? 'Saving...' : 'Save'}
-                          </button>
+                            Save
+                          </LoadingButton>
                           <button
                             onClick={() => { setEditId(null); setMessage(''); }}
                             className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors"
@@ -194,12 +197,13 @@ export default function AdminDates() {
                           >
                             Edit
                           </button>
-                          <button
+                          <LoadingButton
                             onClick={() => handleDelete(d.id)}
-                            className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
+                            variant="ghost"
+                            className="bg-red-50 text-red-600 hover:bg-red-100"
                           >
                             Delete
-                          </button>
+                          </LoadingButton>
                         </>
                       )}
                     </div>

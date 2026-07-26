@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/style.css';
 import { format } from 'date-fns';
 import { slotLabel, to12h, EXAM_CENTERS } from '@/lib/slots';
+import LoadingButton from '@/components/ui/LoadingButton';
 
 interface DateOption {
   id: number;
@@ -466,6 +467,7 @@ function StepSummary({
   pricePerTicket,
   onBack,
   onProceedToPayment,
+  processing,
 }: {
   selectedDate: string;
   selectedTime: string;
@@ -475,6 +477,7 @@ function StepSummary({
   pricePerTicket: number;
   onBack: () => void;
   onProceedToPayment: () => void;
+  processing: boolean;
 }) {
   const total = passengers.length * pricePerTicket;
 
@@ -554,15 +557,18 @@ function StepSummary({
         >
           Back
         </button>
-        <button
+        <LoadingButton
           onClick={onProceedToPayment}
-          className="btn-primary flex-1 justify-center"
+          loading={processing}
+          loadingText="Creating booking..."
+          variant="primary"
+          className="flex-1 justify-center"
         >
           Proceed to Payment
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
           </svg>
-        </button>
+        </LoadingButton>
       </div>
     </div>
   );
@@ -617,33 +623,23 @@ function StepRazorpayPayment({
       </div>
 
       <div className="space-y-3">
-        <button
+        <LoadingButton
           onClick={onPay}
-          disabled={processing}
-          className="btn-primary w-full justify-center text-lg"
+          loading={processing}
+          loadingText="Opening Razorpay..."
+          variant="primary"
+          className="w-full justify-center text-lg"
         >
-          {processing ? (
-            <>
-              <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Opening Razorpay...
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-              Pay with Razorpay
-            </>
-          )}
-        </button>
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+          Pay with Razorpay
+        </LoadingButton>
 
         <button
           onClick={onBack}
           disabled={processing}
-          className="btn-outline w-full justify-center disabled:opacity-50"
+          className="btn-outline w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Back
         </button>
@@ -673,6 +669,8 @@ export default function BookPageClient() {
   const [processing, setProcessing] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState('');
+  const bookingBusyRef = useRef(false);
+  const paymentBusyRef = useRef(false);
   const [settings, setSettings] = useState<{ price_per_ticket: string } | null>(null);
   const [settingsError, setSettingsError] = useState('');
 
@@ -787,7 +785,8 @@ export default function BookPageClient() {
   };
 
   const handleCreateBooking = async () => {
-    if (!selectedDateId || !selectedSlotId) return;
+    if (!selectedDateId || !selectedSlotId || bookingBusyRef.current) return;
+    bookingBusyRef.current = true;
     setProcessing(true);
 
     try {
@@ -806,6 +805,7 @@ export default function BookPageClient() {
         const err = await bookingRes.json();
         alert(err.error || 'Booking failed');
         setProcessing(false);
+        bookingBusyRef.current = false;
         return;
       }
 
@@ -813,15 +813,18 @@ export default function BookPageClient() {
       setBookingId(booking.booking_id);
       setStep(5);
       setProcessing(false);
+      bookingBusyRef.current = false;
     } catch (err) {
       console.error('[Booking] handleCreateBooking error:', err);
       alert('Something went wrong. Please try again.');
       setProcessing(false);
+      bookingBusyRef.current = false;
     }
   };
 
   const handleRazorpayPayment = async () => {
-    if (!bookingId) return;
+    if (!bookingId || paymentBusyRef.current) return;
+    paymentBusyRef.current = true;
     setProcessing(true);
     setPaymentError('');
 
@@ -837,6 +840,7 @@ export default function BookPageClient() {
       if (!res.ok || !data.order_id) {
         setPaymentError(data.error || 'Could not initiate payment. Please try again.');
         setProcessing(false);
+        paymentBusyRef.current = false;
         return;
       }
 
@@ -963,10 +967,12 @@ export default function BookPageClient() {
 
       // Start polling fallback after modal opens
       startPolling();
+      paymentBusyRef.current = false;
     } catch (err) {
       console.error('[Booking] handleRazorpayPayment error:', err);
       setPaymentError('Could not connect to payment gateway. Please try again.');
       setProcessing(false);
+      paymentBusyRef.current = false;
     }
   };
 
@@ -1106,6 +1112,7 @@ export default function BookPageClient() {
               pricePerTicket={pricePerTicket}
               onBack={() => setStep(3)}
               onProceedToPayment={handleCreateBooking}
+              processing={processing}
             />
           )}
 

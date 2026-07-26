@@ -3,6 +3,7 @@
 import { useEffect, useState, use, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import LoadingButton from '@/components/ui/LoadingButton';
 
 interface BookingStatus {
   status: string;
@@ -33,6 +34,7 @@ export default function BookingStatusPage({
   const router = useRouter();
   const [status, setStatus] = useState<BookingStatus | null>(null);
   const [polling, setPolling] = useState(true);
+  const [downloading, setDownloading] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   const checkStatus = useCallback(async () => {
@@ -92,11 +94,14 @@ export default function BookingStatusPage({
   }, [bookingId, token, checkStatus, router]);
 
   const handleDownload = async () => {
+    if (downloading) return;
+    setDownloading(true);
     try {
       const res = await fetch(`/api/bookings/${bookingId}/receipt?t=${token}`, { cache: 'no-store' });
       if (res.status === 409) {
         // Still pending, resume polling
         fireEvent(bookingId, 'download_attempt_pending', '');
+        setDownloading(false);
         return;
       }
       if (!res.ok) throw new Error('Download failed');
@@ -111,6 +116,7 @@ export default function BookingStatusPage({
     } catch {
       fireEvent(bookingId, 'download_error', '');
     }
+    setDownloading(false);
   };
 
   const isConfirmed = status?.status === 'confirmed';
@@ -137,12 +143,12 @@ export default function BookingStatusPage({
               )}
               <p className="text-gray-500 mb-6">Your booking has been confirmed. You can now download your receipt.</p>
 
-              <button onClick={handleDownload} className="btn-primary w-full justify-center mb-3">
+              <LoadingButton onClick={handleDownload} loading={downloading} loadingText="Downloading..." variant="primary" className="w-full justify-center mb-3">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.293.707l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 Download Receipt (Word)
-              </button>
+              </LoadingButton>
 
               <Link href="/" className="btn-outline w-full justify-center">
                 Return Home

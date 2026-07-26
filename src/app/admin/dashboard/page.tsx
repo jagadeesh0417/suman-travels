@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
+import LoadingButton from '@/components/ui/LoadingButton';
 
 interface Stats {
   totalBookings: number;
@@ -16,12 +17,15 @@ interface Stats {
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   const loadStats = () => {
+    setRefreshing(true);
     fetch('/api/admin/stats')
       .then((r) => r.json())
-      .then(setStats);
+      .then(setStats)
+      .finally(() => setRefreshing(false));
   };
 
   useEffect(() => {
@@ -73,12 +77,15 @@ export default function AdminDashboard() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-[#1e3a5f]">Dashboard</h1>
-        <button
+        <LoadingButton
           onClick={loadStats}
-          className="px-4 py-2 text-sm font-medium text-[#1e3a5f] bg-[#1e3a5f]/5 rounded-lg hover:bg-[#1e3a5f]/10 transition-colors"
+          loading={refreshing}
+          loadingText="↻ Refreshing..."
+          variant="ghost"
+          className="px-4 py-2 text-sm font-medium text-[#1e3a5f] bg-[#1e3a5f]/5 hover:bg-[#1e3a5f]/10"
         >
           ↻ Refresh
-        </button>
+        </LoadingButton>
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">

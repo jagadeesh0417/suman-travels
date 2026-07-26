@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
+import LoadingButton from '@/components/ui/LoadingButton';
 
 interface DateFile {
   date: string;
@@ -11,6 +12,7 @@ export default function AdminDocuments() {
   const [files, setFiles] = useState<DateFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [downloading, setDownloading] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   const loadFiles = useCallback(async (isBackground = false) => {
@@ -46,6 +48,8 @@ export default function AdminDocuments() {
   }, [loadFiles]);
 
   const handleDownload = async (date: string) => {
+    if (downloading) return;
+    setDownloading(date);
     try {
       const res = await fetch(`/api/documents?download=${date}&_t=${Date.now()}`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Document not found');
@@ -64,6 +68,7 @@ export default function AdminDocuments() {
       console.error('[Documents] handleDownload error:', err);
       alert('Failed to download. No confirmed bookings for this date.');
     }
+    setDownloading(null);
   };
 
   return (
@@ -75,15 +80,18 @@ export default function AdminDocuments() {
             <div className="w-4 h-4 border-2 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
           )}
         </div>
-        <button
+        <LoadingButton
           onClick={() => loadFiles()}
-          className="px-4 py-2 text-sm font-medium text-[#1e3a5f] bg-[#1e3a5f]/5 rounded-lg hover:bg-[#1e3a5f]/10 transition-colors flex items-center gap-2 self-start"
+          loading={refreshing}
+          loadingText="Refreshing..."
+          variant="ghost"
+          className="px-4 py-2 text-sm font-medium text-[#1e3a5f] bg-[#1e3a5f]/5 hover:bg-[#1e3a5f]/10 self-start"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
           Refresh
-        </button>
+        </LoadingButton>
       </div>
       <p className="text-gray-500 mb-6">
         One Excel file per travel date, grouped by Exam Center and Slot. Auto-refreshes every 5 seconds.
@@ -136,15 +144,18 @@ export default function AdminDocuments() {
                       </p>
                     </div>
                   </div>
-                  <button
+                  <LoadingButton
                     onClick={() => handleDownload(f.date)}
-                    className="px-4 py-2 bg-[#1e3a5f] text-white rounded-lg text-sm font-semibold hover:bg-[#2a4f7f] transition-colors flex items-center gap-2"
+                    loading={downloading === f.date}
+                    loadingText="Downloading..."
+                    variant="primary"
+                    className="!px-4 !py-2 !text-sm"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.293.707l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     Download
-                  </button>
+                  </LoadingButton>
                 </div>
               );
             })}

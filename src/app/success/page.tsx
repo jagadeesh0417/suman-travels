@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useRef } from 'react';
 import Link from 'next/link';
 import { slotLabel, to12h } from '@/lib/slots';
+import LoadingButton from '@/components/ui/LoadingButton';
 
 interface BookingData {
   booking_id: string;
@@ -31,6 +32,8 @@ export default function SuccessPage({
   const { id } = use(searchParams);
   const [booking, setBooking] = useState<BookingData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const downloadBusyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -46,6 +49,10 @@ export default function SuccessPage({
 
   const handleDownload = async () => {
     if (!booking) return;
+    const key = 'report';
+    if (downloadBusyRef.current) return;
+    downloadBusyRef.current = key;
+    setDownloading(key);
     try {
       const res = await fetch(`/api/documents?download=${booking.date}`);
       if (!res.ok) throw new Error('Document not found');
@@ -63,6 +70,8 @@ export default function SuccessPage({
     } catch {
       alert('Report not available yet. Please try again shortly.');
     }
+    setDownloading(null);
+    downloadBusyRef.current = null;
   };
 
   if (loading) {
@@ -200,29 +209,29 @@ export default function SuccessPage({
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <button onClick={() => window.print()} className="btn-primary justify-center">
+          <LoadingButton onClick={() => window.print()} variant="primary" className="justify-center">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
             </svg>
             Download Ticket
-          </button>
+          </LoadingButton>
           {booking?.receipt_token && (
             <Link
               href={`/api/bookings/${booking.booking_id}/receipt?t=${booking.receipt_token}`}
               className="btn-outline justify-center"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.293.707l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               Download Receipt (Word)
             </Link>
           )}
-          <button onClick={handleDownload} className="btn-outline justify-center">
+          <LoadingButton onClick={handleDownload} loading={downloading === 'report'} loadingText="Downloading..." variant="outline" className="justify-center">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.293.707l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             Download Report
-          </button>
+          </LoadingButton>
           <Link href="/download-ticket" className="btn-outline justify-center">
             Lost Ticket? Re-download
           </Link>

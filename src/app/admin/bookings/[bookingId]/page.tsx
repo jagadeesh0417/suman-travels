@@ -3,6 +3,7 @@
 import { useEffect, useState, use, useCallback } from 'react';
 import Link from 'next/link';
 import { slotLabel } from '@/lib/slots';
+import LoadingButton from '@/components/ui/LoadingButton';
 
 interface Passenger {
   name: string;
@@ -41,11 +42,14 @@ export default function BookingDetailPage({
 }) {
   const { bookingId } = use(params);
   const [booking, setBooking] = useState<BookingDetail | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadBooking = useCallback(() => {
+    setRefreshing(true);
     fetch(`/api/bookings/${bookingId}`)
       .then((r) => r.json())
-      .then(setBooking);
+      .then(setBooking)
+      .finally(() => setRefreshing(false));
   }, [bookingId]);
 
   useEffect(loadBooking, [loadBooking]);
@@ -70,12 +74,15 @@ export default function BookingDetailPage({
           </svg>
         </Link>
         <h1 className="text-2xl font-bold text-[#1e3a5f]">Booking Details</h1>
-        <button
+        <LoadingButton
           onClick={loadBooking}
-          className="ml-auto px-4 py-2 text-sm font-medium text-[#1e3a5f] bg-[#1e3a5f]/5 rounded-lg hover:bg-[#1e3a5f]/10 transition-colors"
+          loading={refreshing}
+          loadingText="↻ Refreshing..."
+          variant="ghost"
+          className="ml-auto px-4 py-2 text-sm font-medium text-[#1e3a5f] bg-[#1e3a5f]/5 hover:bg-[#1e3a5f]/10"
         >
           ↻ Refresh
-        </button>
+        </LoadingButton>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6 mb-6">

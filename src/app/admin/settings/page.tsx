@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import LoadingButton from '@/components/ui/LoadingButton';
 
 interface Settings {
   upi_id: string;
@@ -15,6 +16,7 @@ export default function AdminSettings() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const busyRef = useRef(false);
 
   useEffect(() => {
     fetch('/api/settings')
@@ -23,22 +25,28 @@ export default function AdminSettings() {
   }, []);
 
   const handleSave = async () => {
-    if (!settings) return;
+    if (!settings || busyRef.current) return;
+    busyRef.current = true;
     setSaving(true);
     setMessage('');
 
-    const res = await fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings),
-    });
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
 
-    if (res.ok) {
-      setMessage('Settings saved successfully');
-    } else {
+      if (res.ok) {
+        setMessage('Settings saved successfully');
+      } else {
+        setMessage('Failed to save settings');
+      }
+    } catch {
       setMessage('Failed to save settings');
     }
     setSaving(false);
+    busyRef.current = false;
     setTimeout(() => setMessage(''), 3000);
   };
 
@@ -155,13 +163,14 @@ export default function AdminSettings() {
           </div>
         )}
 
-        <button
+        <LoadingButton
           type="submit"
-          disabled={saving}
-          className="btn-primary"
+          loading={saving}
+          loadingText="Saving..."
+          variant="primary"
         >
-          {saving ? 'Saving...' : 'Save Settings'}
-        </button>
+          Save Settings
+        </LoadingButton>
       </form>
     </div>
   );
