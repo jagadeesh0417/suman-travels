@@ -72,7 +72,6 @@ export default function AdminLogin() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input-field"
-              placeholder="admin@sumantravels.com"
               required
               disabled={loading}
             />
