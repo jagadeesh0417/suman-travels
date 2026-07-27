@@ -36,31 +36,74 @@ export default function BookingStatusPage({
   const [status, setStatus] = useState<BookingStatus | null>(null);
   const [polling, setPolling] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState('');
   const pollingRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const stopPolling = useCallback(() => {
+    setPolling(false);
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = undefined;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = undefined;
+    }
+  }, []);
 
   const checkStatus = useCallback(async () => {
     try {
       const res = await fetch(`/api/bookings/${bookingId}/status?t=${token}`, { cache: 'no-store' });
-      if (!res.ok) {
-        if (res.status === 404) {
-          setPolling(false);
-          clearInterval(pollingRef.current);
-        }
+
+      if (res.status === 404) {
+        console.log(`[StatusPage] Booking ${bookingId} not found (404)`);
+        stopPolling();
+        setError('Booking not found. It may have been removed or the link is invalid.');
         return;
       }
+
+      if (!res.ok) {
+        console.log(`[StatusPage] Status check returned ${res.status} for ${bookingId}`);
+        return;
+      }
+
       const data: BookingStatus = await res.json();
       setStatus(data);
 
-      if (data.status === 'confirmed') {
-        setPolling(false);
-        clearInterval(pollingRef.current);
-        fireEvent(bookingId, 'status_confirmed', `serial=${data.serial_number}`);
-      } else if (data.status === 'paid_detected') {
-        // Payment detected but not yet confirmed by webhook — keep polling
-        fireEvent(bookingId, 'paid_detected', '');
+      switch (data.status) {
+        case 'confirmed':
+          console.log(`[StatusPage] Booking ${bookingId} confirmed, serial=${data.serial_number}`);
+          stopPolling();
+          fireEvent(bookingId, 'status_confirmed', `serial=${data.serial_number}`);
+          break;
+        case 'failed':
+          console.log(`[StatusPage] Booking ${bookingId} payment failed`);
+          stopPolling();
+          fireEvent(bookingId, 'status_failed', '');
+          break;
+        case 'cancelled':
+          console.log(`[StatusPage] Booking ${bookingId} payment cancelled`);
+          stopPolling();
+          fireEvent(bookingId, 'status_cancelled', '');
+          break;
+        case 'expired':
+          console.log(`[StatusPage] Booking ${bookingId} payment expired`);
+          stopPolling();
+          fireEvent(bookingId, 'status_expired', '');
+          break;
+        case 'paid_detected':
+          // Payment detected but not yet confirmed by webhook — keep polling
+          fireEvent(bookingId, 'paid_detected', '');
+          break;
+        default:
+          // pending, created, etc — keep polling
+          break;
       }
-    } catch {}
-  }, [bookingId, token]);
+    } catch (err: any) {
+      console.error(`[StatusPage] checkStatus error for ${bookingId}:`, err?.message || err);
+    }
+  }, [bookingId, token, stopPolling]);
 
   useEffect(() => {
     fireEvent(bookingId, 'status_page_loaded', `token_present=${!!token}`);
@@ -72,27 +115,18 @@ export default function BookingStatusPage({
 
     checkStatus();
 
-    // Aggressive polling: every 2s for first 20s, then every 5s to 120s ceiling
-    let fastPolls = 0;
-    pollingRef.current = setInterval(async () => {
-      fastPolls++;
-      if (fastPolls > 10) {
-        clearInterval(pollingRef.current);
-        // Switch to 5s polling
-        pollingRef.current = setInterval(checkStatus, 5000);
-        // Stop after 120s total
-        setTimeout(() => {
-          clearInterval(pollingRef.current);
-          setPolling(false);
-        }, 120000 - 20000);
-      }
-      await checkStatus();
-    }, 2000);
+    // Poll every 3s for up to 2 minutes
+    pollingRef.current = setInterval(checkStatus, 3000);
+    timeoutRef.current = setTimeout(() => {
+      console.log(`[StatusPage] Polling timed out for ${bookingId}`);
+      stopPolling();
+      setError('Payment verification timed out. Please contact support if your payment was deducted.');
+    }, 120000);
 
     return () => {
-      clearInterval(pollingRef.current);
+      stopPolling();
     };
-  }, [bookingId, token, checkStatus, router]);
+  }, [bookingId, token, checkStatus, router, stopPolling]);
 
   const handleDownload = async () => {
     if (downloading) return;
@@ -100,7 +134,6 @@ export default function BookingStatusPage({
     try {
       const res = await fetch(`/api/bookings/${bookingId}/receipt?t=${token}`, { cache: 'no-store' });
       if (res.status === 409) {
-        // Still pending, resume polling
         fireEvent(bookingId, 'download_attempt_pending', '');
         setDownloading(false);
         return;
@@ -110,17 +143,21 @@ export default function BookingStatusPage({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Receipt-${bookingId}.docx`; // Download filename does not need IST conversion
+      a.download = `Receipt-${bookingId}.docx`;
       a.click();
       URL.revokeObjectURL(url);
       fireEvent(bookingId, 'receipt_downloaded', '');
     } catch {
       fireEvent(bookingId, 'download_error', '');
+    } finally {
+      setDownloading(false);
     }
-    setDownloading(false);
   };
 
   const isConfirmed = status?.status === 'confirmed';
+  const isFailed = status?.status === 'failed';
+  const isCancelled = status?.status === 'cancelled';
+  const isExpired = status?.status === 'expired';
 
   return (
     <div className="min-h-screen bg-gray-50 py-10">
@@ -155,25 +192,86 @@ export default function BookingStatusPage({
                 Return Home
               </Link>
             </>
-          ) : polling ? (
+          ) : isFailed ? (
+            <>
+              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
+                <svg className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-red-600 mb-2">Payment Failed</h2>
+              <p className="text-gray-500 mb-2">{status?.message || 'Your payment was not successful.'}</p>
+              <p className="text-sm text-gray-400 mb-6">Please try booking again. If money was deducted, contact support.</p>
+              <Link href="/book" className="btn-primary w-full justify-center mb-3">
+                Try Again
+              </Link>
+              <Link href="/" className="btn-outline w-full justify-center">
+                Return Home
+              </Link>
+            </>
+          ) : isCancelled ? (
+            <>
+              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gray-50 flex items-center justify-center">
+                <svg className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-600 mb-2">Payment Cancelled</h2>
+              <p className="text-gray-500 mb-6">You cancelled the payment. No charges were made.</p>
+              <Link href="/book" className="btn-primary w-full justify-center mb-3">
+                Book Again
+              </Link>
+              <Link href="/" className="btn-outline w-full justify-center">
+                Return Home
+              </Link>
+            </>
+          ) : isExpired ? (
+            <>
+              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-yellow-50 flex items-center justify-center">
+                <svg className="w-10 h-10 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-yellow-600 mb-2">Payment Session Expired</h2>
+              <p className="text-gray-500 mb-6">Your payment session expired. Please try booking again.</p>
+              <Link href="/book" className="btn-primary w-full justify-center mb-3">
+                Book Again
+              </Link>
+              <Link href="/" className="btn-outline w-full justify-center">
+                Return Home
+              </Link>
+            </>
+          ) : error ? (
+            <>
+              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
+                <svg className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-red-600 mb-2">Error</h2>
+              <p className="text-gray-500 mb-4">{error}</p>
+              <p className="text-sm text-gray-400 mb-6">
+                Call <a href="tel:+919010532226" className="text-[#1e3a5f] font-medium">+91 9010532226</a> for assistance.
+              </p>
+              <Link href="/book" className="btn-primary w-full justify-center mb-3">
+                Book Again
+              </Link>
+              <Link href="/" className="btn-outline w-full justify-center">
+                Return Home
+              </Link>
+            </>
+          ) : (
             <>
               <div className="w-16 h-16 mx-auto mb-4">
                 <div className="w-10 h-10 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin mx-auto" />
               </div>
-              <h2 className="text-xl font-bold text-[#1e3a5f] mb-2">Confirming your booking…</h2>
+              <h2 className="text-xl font-bold text-[#1e3a5f] mb-2">
+                {status?.status === 'paid_detected' ? 'Payment Confirmed, Finalizing...' : 'Confirming your booking\u2026'}
+              </h2>
               <p className="text-xs text-gray-400">{bookingId}</p>
-            </>
-          ) : (
-            <>
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-50 flex items-center justify-center">
-                <svg className="w-10 h-10 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <h2 className="text-xl font-bold text-[#1e3a5f] mb-2">Payment received</h2>
-              <p className="text-gray-500 mb-4">
-                We're confirming your booking. Call <a href="tel:+919010532226" className="text-[#1e3a5f] font-medium">+91 9010532226</a> if you need help.
-              </p>
+              {status?.status === 'paid_detected' && (
+                <p className="text-sm text-green-600 mt-2">Payment received! Finalizing your booking...</p>
+              )}
             </>
           )}
         </div>

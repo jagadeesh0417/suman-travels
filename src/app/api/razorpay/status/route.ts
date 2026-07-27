@@ -22,13 +22,40 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
 
-    // If already confirmed, return immediately
+    // Terminal statuses — return immediately without Razorpay API call
     if (booking.payment_status === 'confirmed') {
       console.log(`[Status] Booking ${bookingId} already confirmed`);
       return NextResponse.json({
         status: 'confirmed',
         booking_id: bookingId,
         serial_number: booking.serial_number,
+      });
+    }
+
+    if (booking.payment_status === 'failed') {
+      console.log(`[Status] Booking ${bookingId} payment failed`);
+      return NextResponse.json({
+        status: 'failed',
+        booking_id: bookingId,
+        message: 'Payment failed. Please try again.',
+      });
+    }
+
+    if (booking.payment_status === 'cancelled') {
+      console.log(`[Status] Booking ${bookingId} payment cancelled`);
+      return NextResponse.json({
+        status: 'cancelled',
+        booking_id: bookingId,
+        message: 'Payment was cancelled.',
+      });
+    }
+
+    if (booking.payment_status === 'expired') {
+      console.log(`[Status] Booking ${bookingId} payment expired`);
+      return NextResponse.json({
+        status: 'expired',
+        booking_id: bookingId,
+        message: 'Payment session expired.',
       });
     }
 

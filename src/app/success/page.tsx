@@ -37,15 +37,20 @@ export default function SuccessPage({
   const downloadBusyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (id) {
-      fetch(`/api/bookings/${id}`)
-        .then((r) => r.json())
-        .then((data) => {
-          setBooking(data);
-          setLoading(false);
-        })
-        .catch(() => setLoading(false));
-    }
+    if (!id) return;
+    fetch(`/api/bookings/${id}`)
+      .then((r) => {
+        if (!r.ok) throw new Error('Not found');
+        return r.json();
+      })
+      .then((data) => {
+        console.log(`[Success] Loaded booking ${id}: status=${data.payment_status}`);
+        setBooking(data);
+      })
+      .catch((err) => {
+        console.error(`[Success] Failed to load booking ${id}:`, err?.message || err);
+      })
+      .finally(() => setLoading(false));
   }, [id]);
 
   const handleDownload = async () => {
@@ -65,11 +70,14 @@ export default function SuccessPage({
       a.download = `${dd}-${mm}-${yyyy}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
+      console.log(`[Success] Report downloaded for ${booking.date}`);
     } catch {
+      console.error(`[Success] Report download failed for ${booking.date}`);
       alert('Report not available yet. Please try again shortly.');
+    } finally {
+      setDownloading(null);
+      downloadBusyRef.current = null;
     }
-    setDownloading(null);
-    downloadBusyRef.current = null;
   };
 
   if (loading) {
@@ -207,12 +215,35 @@ export default function SuccessPage({
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <LoadingButton onClick={() => window.print()} variant="primary" className="justify-center">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            Download Ticket
-          </LoadingButton>
+          {booking?.receipt_token && (
+            <LoadingButton
+              onClick={async () => {
+                if (!booking) return;
+                try {
+                  const res = await fetch(`/api/bookings/${booking.booking_id}/receipt?t=${booking.receipt_token}`);
+                  if (!res.ok) throw new Error('Download failed');
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `Receipt-${booking.booking_id}.docx`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch {
+                  alert('Could not download receipt. Please try again.');
+                }
+              }}
+              loading={downloading === 'receipt'}
+              loadingText="Downloading..."
+              variant="primary"
+              className="justify-center"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.293.707l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Download Receipt
+            </LoadingButton>
+          )}
           {booking?.receipt_token && (
             <Link
               href={`/api/bookings/${booking.booking_id}/receipt?t=${booking.receipt_token}`}

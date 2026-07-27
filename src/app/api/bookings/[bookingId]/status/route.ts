@@ -48,9 +48,35 @@ export async function GET(
     const paymentStatus = booking.payment_status as string;
     const serialNumber = booking.serial_number as number | null;
 
+    // Terminal states — return immediately
     if (paymentStatus === 'confirmed') {
+      console.log(`[Status] Booking ${bookingId} already confirmed`);
       return NextResponse.json(
         { status: 'confirmed', booking_id: bookingId, serial_number: serialNumber },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
+
+    if (paymentStatus === 'failed') {
+      console.log(`[Status] Booking ${bookingId} payment failed`);
+      return NextResponse.json(
+        { status: 'failed', booking_id: bookingId, message: 'Payment failed. Please try again.' },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
+
+    if (paymentStatus === 'cancelled') {
+      console.log(`[Status] Booking ${bookingId} payment cancelled`);
+      return NextResponse.json(
+        { status: 'cancelled', booking_id: bookingId, message: 'Payment was cancelled.' },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
+
+    if (paymentStatus === 'expired') {
+      console.log(`[Status] Booking ${bookingId} payment expired`);
+      return NextResponse.json(
+        { status: 'expired', booking_id: bookingId, message: 'Payment session expired.' },
         { headers: { 'Cache-Control': 'no-store' } }
       );
     }
@@ -68,6 +94,7 @@ export async function GET(
         const order = await fetchOrderStatus(razorpayOrderId);
         if (order.status === 'paid') {
           // Payment detected but not yet confirmed — trigger confirm via status endpoint
+          console.log(`[Status] Order ${razorpayOrderId} is paid, confirming booking ${bookingId}`);
           return NextResponse.json(
             { status: 'paid_detected', message: 'Payment detected, confirming...', booking_id: bookingId },
             { headers: { 'Cache-Control': 'no-store' } }
@@ -77,7 +104,8 @@ export async function GET(
           { status: order.status, message: 'Awaiting payment...', booking_id: bookingId },
           { headers: { 'Cache-Control': 'no-store' } }
         );
-      } catch {
+      } catch (err: any) {
+        console.error(`[Status] fetchOrderStatus error for ${razorpayOrderId}:`, err?.message || err);
         // Razorpay API error — keep polling
       }
     }

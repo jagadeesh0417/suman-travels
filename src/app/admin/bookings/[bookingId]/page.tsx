@@ -105,8 +105,14 @@ export default function BookingDetailPage({
               <span
                 className={`px-3 py-0.5 rounded-full text-xs font-semibold ${
                   booking.payment_status === 'confirmed'
-                    ? 'bg-green-50 text-green-600'
-                    : 'bg-amber-50 text-amber-600'
+                    ? 'bg-green-50 text-green-700'
+                    : booking.payment_status === 'failed'
+                    ? 'bg-red-50 text-red-700'
+                    : booking.payment_status === 'cancelled'
+                    ? 'bg-gray-50 text-gray-500'
+                    : booking.payment_status === 'expired'
+                    ? 'bg-yellow-50 text-yellow-700'
+                    : 'bg-amber-50 text-amber-700'
                 }`}
               >
                 {booking.payment_status}

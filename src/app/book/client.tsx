@@ -132,6 +132,7 @@ function StepSelectSlot({
   const [selectedDateId, setSelectedDateId] = useState<number | null>(null);
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [slotsLoading, setSlotsLoading] = useState(false);
 
   useEffect(() => {
     fetch('/api/dates')
@@ -144,21 +145,26 @@ function StepSelectSlot({
         );
         setDates(futureDates);
         setLoading(false);
-      });
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   const loadSlots = useCallback(async (dateId: number) => {
+    setSlotsLoading(true);
     setSelectedSlotId(null);
-    const res = await fetch(`/api/slots?date_id=${dateId}`);
-    const data = await res.json();
-    setSlots(
-      (data as SlotOption[]).filter(
-        (s) => s.enabled === 1
-      )
-    );
+    try {
+      const res = await fetch(`/api/slots?date_id=${dateId}`);
+      const data = await res.json();
+      setSlots((data as SlotOption[]).filter((s) => s.enabled === 1));
+    } catch {
+      setSlots([]);
+    } finally {
+      setSlotsLoading(false);
+    }
   }, []);
 
   const handleDateSelect = (dateId: number) => {
+    console.log(`[Booking] Date selected: ${dateId}`);
     setSelectedDateId(dateId);
     loadSlots(dateId);
   };
@@ -191,35 +197,48 @@ function StepSelectSlot({
           <label className="block text-sm font-semibold text-gray-700 mb-3">
             Select Time Slot
           </label>
-          {slots.length === 0 ? (
+          {slotsLoading ? (
+            <div className="text-center py-8 bg-gray-50 rounded-xl">
+              <div className="w-6 h-6 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <p className="text-gray-500">Checking slot availability...</p>
+              <p className="text-xs text-gray-400 mt-1">Please wait...</p>
+            </div>
+          ) : slots.length === 0 ? (
             <div className="text-center py-8 bg-gray-50 rounded-xl">
               <p className="text-gray-500">No slots available for this date</p>
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {slots.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedSlotId(s.id)}
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${
-                    selectedSlotId === s.id
-                      ? 'border-[#1e3a5f] bg-[#1e3a5f]/5 shadow-md'
-                      : 'border-gray-100 hover:border-gray-200 bg-white'
-                  }`}
-                >
-                  <div className="mb-1">
-                    <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Slot</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-gray-900">{slotLabel(s.time)}</span>
-                  </div>
-                  {s.vehicle_time && (
-                    <div className="mt-2 text-xs text-orange-600 font-medium">
-                      Vehicle @ {to12h(s.vehicle_time)}
+              {slots.map((s) => {
+                const isSelected = selectedSlotId === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      console.log(`[Booking] Slot selected: ${s.time} (id=${s.id})`);
+                      setSelectedSlotId(s.id);
+                    }}
+                    disabled={slotsLoading}
+                    className={`p-4 rounded-xl border-2 text-left transition-all ${
+                      isSelected
+                        ? 'border-[#1e3a5f] bg-[#1e3a5f]/5 shadow-md'
+                        : 'border-gray-100 hover:border-gray-200 bg-white'
+                    } ${slotsLoading ? 'opacity-50 cursor-wait' : ''}`}
+                  >
+                    <div className="mb-1">
+                      <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Slot</span>
                     </div>
-                  )}
-                </button>
-              ))}
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-gray-900">{slotLabel(s.time)}</span>
+                    </div>
+                    {s.vehicle_time && (
+                      <div className="mt-2 text-xs text-orange-600 font-medium">
+                        Vehicle @ {to12h(s.vehicle_time)}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -227,7 +246,7 @@ function StepSelectSlot({
 
       <button
         onClick={() => selectedDateId && selectedSlotId && onNext(selectedDateId, selectedSlotId)}
-        disabled={!selectedDateId || !selectedSlotId}
+        disabled={!selectedDateId || !selectedSlotId || slotsLoading}
         className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Continue
@@ -787,6 +806,8 @@ export default function BookPageClient() {
     setProcessing(true);
 
     try {
+      console.log(`[Booking] Creating booking: date=${selectedDateId}, slot=${selectedSlotId}, center=${examCenter}, passengers=${passengers.length}`);
+
       const bookingRes = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -800,20 +821,26 @@ export default function BookPageClient() {
 
       if (!bookingRes.ok) {
         const err = await bookingRes.json();
+        console.error(`[Booking] Create booking failed: ${err.error || 'Unknown error'}`);
         alert(err.error || 'Booking failed');
-        setProcessing(false);
-        bookingBusyRef.current = false;
         return;
       }
 
       const booking = await bookingRes.json();
+
+      if (!booking.success || !booking.booking_id) {
+        console.error(`[Booking] Unexpected response:`, booking);
+        alert('Booking failed. Please try again.');
+        return;
+      }
+
+      console.log(`[Booking] Booking created: ${booking.booking_id}`);
       setBookingId(booking.booking_id);
       setStep(5);
-      setProcessing(false);
-      bookingBusyRef.current = false;
     } catch (err) {
       console.error('[Booking] handleCreateBooking error:', err);
       alert('Something went wrong. Please try again.');
+    } finally {
       setProcessing(false);
       bookingBusyRef.current = false;
     }
@@ -826,6 +853,8 @@ export default function BookPageClient() {
     setPaymentError('');
 
     try {
+      console.log(`[Payment] Initiating payment for booking ${bookingId}`);
+
       const res = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -835,11 +864,12 @@ export default function BookPageClient() {
       const data = await res.json();
 
       if (!res.ok || !data.order_id) {
+        console.error(`[Payment] Create order failed: ${data.error || 'Unknown error'}`);
         setPaymentError(data.error || 'Could not initiate payment. Please try again.');
-        setProcessing(false);
-        paymentBusyRef.current = false;
         return;
       }
+
+      console.log(`[Payment] Order created: ${data.order_id}, amount: ${data.amount}`);
 
       const receiptToken = data.receipt_token;
       const navToStatus = () => router.push(`/booking/${bookingId}?t=${receiptToken}`);
@@ -879,8 +909,10 @@ export default function BookPageClient() {
           if (Date.now() - startTime > maxWait) {
             stopPolling();
             if (!paymentCompleted) {
+              console.log(`[Payment] Polling timed out for booking ${bookingId}`);
               setPaymentError('Payment verification timed out. Check your booking or contact support.');
               setProcessing(false);
+              paymentBusyRef.current = false;
             }
             return;
           }
@@ -890,13 +922,16 @@ export default function BookPageClient() {
             const statusData = await statusRes.json();
 
             if (statusData.status === 'confirmed' || statusData.status === 'paid_detected') {
+              console.log(`[Payment] Polling detected confirmed/payment for ${bookingId}`);
               paymentCompleted = true;
               stopPolling();
               navToStatus();
             } else if (statusData.status === 'failed' || statusData.status === 'error') {
               stopPolling();
+              console.log(`[Payment] Polling detected failure for ${bookingId}: ${statusData.error || ''}`);
               setPaymentError(statusData.error || 'Payment failed. Please try again.');
               setProcessing(false);
+              paymentBusyRef.current = false;
             }
           } catch (pollErr) {
             console.error('[Payment] Status polling error:', pollErr);
@@ -920,33 +955,47 @@ export default function BookPageClient() {
           stopPolling();
           if (paymentCompleted) return;
           paymentCompleted = true;
+          console.log(`[Payment] Razorpay handler fired: payment_id=${response.razorpay_payment_id}`);
           fireEvent('handler_fired', `payment_id=${response.razorpay_payment_id}`);
           setProcessing(true);
-          const verifyRes = await fetch('/api/razorpay/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              booking_id: bookingId,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            }),
-          });
+          try {
+            const verifyRes = await fetch('/api/razorpay/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                booking_id: bookingId,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
 
-          if (verifyRes.ok) {
-            navToStatus();
-          } else {
-            const errData = await verifyRes.json();
-            setPaymentError(errData.error || 'Payment verification failed. Please contact support.');
+            if (verifyRes.ok) {
+              console.log(`[Payment] Payment verified, navigating to status page for ${bookingId}`);
+              navToStatus();
+            } else {
+              const errData = await verifyRes.json();
+              console.error(`[Payment] Verification failed: ${errData.error || ''}`);
+              setPaymentError(errData.error || 'Payment verification failed. Please contact support.');
+              setProcessing(false);
+              paymentBusyRef.current = false;
+            }
+          } catch (verifyErr) {
+            console.error('[Payment] Verify request error:', verifyErr);
+            setPaymentError('Payment verification failed. Please contact support.');
             setProcessing(false);
+            paymentBusyRef.current = false;
           }
         },
         modal: {
           ondismiss: function () {
+            console.log(`[Payment] Modal dismissed by user for booking ${bookingId}`);
             stopPolling();
             if (!paymentCompleted) {
               fireEvent('modal_dismissed', '');
-              navToStatus();
+              setPaymentError('Payment cancelled. You can try again or go back.');
+              setProcessing(false);
+              paymentBusyRef.current = false;
             }
           },
         },
@@ -954,20 +1003,23 @@ export default function BookPageClient() {
 
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', function (response: any) {
+        console.log(`[Payment] Payment failed for booking ${bookingId}: ${response.error?.description || 'Unknown error'}`);
         stopPolling();
         paymentCompleted = true;
         fireEvent('payment_failed', response.error?.description || '');
-        navToStatus();
+        setPaymentError('Payment failed: ' + (response.error?.description || 'Please try again.'));
+        setProcessing(false);
+        paymentBusyRef.current = false;
       });
       rzp.open();
       setProcessing(false);
 
       // Start polling fallback after modal opens
       startPolling();
-      paymentBusyRef.current = false;
     } catch (err) {
       console.error('[Booking] handleRazorpayPayment error:', err);
       setPaymentError('Could not connect to payment gateway. Please try again.');
+    } finally {
       setProcessing(false);
       paymentBusyRef.current = false;
     }
@@ -1117,7 +1169,11 @@ export default function BookPageClient() {
             <StepRazorpayPayment
               amount={passengers.length * pricePerTicket}
               bookingRef={bookingId}
-              onBack={() => setStep(4)}
+              onBack={() => {
+                setPaymentError('');
+                setProcessing(false);
+                setStep(4);
+              }}
               onPay={handleRazorpayPayment}
               paymentError={paymentError}
               processing={processing}

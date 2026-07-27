@@ -115,6 +115,34 @@ export async function POST(request: NextRequest) {
       return await processPayment(payment);
     }
 
+    if (eventType === 'payment.failed' && payment) {
+      const razorpayOrderId = payment.order_id;
+      const failedAmount = Number(payment.amount) || 0;
+      console.log(`[Webhook] payment.failed: ${payment.id} for order ${razorpayOrderId} - ${payment.error_description || ''}`);
+      // Find and update booking status to failed
+      try {
+        const bookingResult = await dbExecute(
+          "SELECT booking_id FROM bookings WHERE razorpay_order_id = ?",
+          [razorpayOrderId]
+        );
+        const booking = rowToObject(bookingResult);
+        if (booking) {
+          const bookingId = booking.booking_id as string;
+          await dbExecute(
+            "UPDATE bookings SET payment_status = 'failed', razorpay_payment_id = ?, razorpay_status = 'failed' WHERE booking_id = ?",
+            [payment.id || '', bookingId]
+          );
+          console.log(`[Webhook] Booking ${bookingId} marked as failed`);
+          await logPaymentEvent(razorpayOrderId, payment.id || '', 'payment.failed', 'failed', failedAmount, true, bookingId, rawBody.slice(0, 500));
+        } else {
+          console.error(`[Webhook] No booking found for failed payment order ${razorpayOrderId}`);
+        }
+      } catch (err: any) {
+        console.error(`[Webhook] Error handling payment.failed:`, err?.message || err);
+      }
+      return NextResponse.json({ status: 'failed' });
+    }
+
     if (eventType === 'order.paid' && order) {
       console.log(`[Webhook] order.paid: ${order.id}`);
       // For order.paid, fetch the payments to get the payment ID

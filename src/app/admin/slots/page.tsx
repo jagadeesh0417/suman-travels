@@ -30,38 +30,55 @@ export default function AdminSlots() {
 
   const loadData = useCallback(() => {
     fetch('/api/slots')
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error('Failed to fetch slots');
+        return r.json();
+      })
       .then((data: SlotRecord[]) => {
         setSlots(data);
         const map: Record<number, string> = {};
         data.forEach((s) => { map[s.id] = s.vehicle_time || ''; });
         setVehicleTimes(map);
+      })
+      .catch((err) => {
+        console.error('[AdminSlots] loadData error:', err?.message || err);
+        showMessage('Failed to load slots. Check connection.');
       });
   }, []);
 
   useEffect(() => { loadData(); return () => clearTimeout(messageTimer.current); }, [loadData]);
 
   const handleToggle = async (id: number, current: number) => {
-    await fetch('/api/slots', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, enabled: current ? 0 : 1 }),
-    });
-    loadData();
-    showMessage(current ? 'Slot disabled' : 'Slot enabled');
+    try {
+      const res = await fetch('/api/slots', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, enabled: current ? 0 : 1 }),
+      });
+      if (!res.ok) throw new Error('Toggle failed');
+      loadData();
+      showMessage(current ? 'Slot disabled' : 'Slot enabled');
+    } catch (err: any) {
+      showMessage('Error: ' + (err?.message || 'Toggle failed'));
+    }
   };
 
   const handleVehicleTimeSave = async (id: number) => {
     if (savingVehicle[id]) return;
     setSavingVehicle((prev) => ({ ...prev, [id]: true }));
-    await fetch('/api/slots', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, vehicle_time: vehicleTimes[id] || '' }),
-    });
+    try {
+      const res = await fetch('/api/slots', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, vehicle_time: vehicleTimes[id] || '' }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      loadData();
+      showMessage('Vehicle time saved');
+    } catch (err: any) {
+      showMessage('Error: ' + (err?.message || 'Save failed'));
+    }
     setSavingVehicle((prev) => ({ ...prev, [id]: false }));
-    loadData();
-    showMessage('Vehicle time saved');
   };
 
   const grouped = slots.reduce((acc, s) => {
@@ -93,9 +110,14 @@ export default function AdminSlots() {
         onClick={async () => {
           setGenerating(true);
           try {
-            await fetch('/api/slots/generate-missing', { method: 'POST' });
+            const res = await fetch('/api/slots/generate-missing', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Generation failed');
+            showMessage(data.message || `Slots generated successfully`);
             loadData();
-          } catch {}
+          } catch (err: any) {
+            showMessage('Error: ' + (err?.message || 'Failed to generate slots'));
+          }
           setGenerating(false);
         }}
         loading={generating}

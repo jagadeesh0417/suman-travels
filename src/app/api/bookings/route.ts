@@ -114,8 +114,10 @@ export async function POST(request: Request) {
       throw e;
     }
 
+    console.log(`[Booking] Created booking ${bookingId} for ${passengers.length} passengers, ₹${amount}`);
     return NextResponse.json(
       {
+        success: true,
         booking_id: bookingId,
         amount,
         passenger_count: passengers.length,

@@ -59,11 +59,14 @@ export default function AdminBookings() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="select-field max-w-[140px]"
+            className="select-field max-w-[160px]"
           >
-            <option value="">All</option>
+            <option value="">All Statuses</option>
             <option value="confirmed">Confirmed</option>
             <option value="pending">Pending</option>
+            <option value="failed">Failed</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="expired">Expired</option>
           </select>
         </div>
       </div>
@@ -128,8 +131,14 @@ export default function AdminBookings() {
                       <span
                         className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                           b.payment_status === 'confirmed'
-                            ? 'bg-green-50 text-green-600'
-                            : 'bg-amber-50 text-amber-600'
+                            ? 'bg-green-50 text-green-700'
+                            : b.payment_status === 'failed'
+                            ? 'bg-red-50 text-red-700'
+                            : b.payment_status === 'cancelled'
+                            ? 'bg-gray-50 text-gray-500'
+                            : b.payment_status === 'expired'
+                            ? 'bg-yellow-50 text-yellow-700'
+                            : 'bg-amber-50 text-amber-700'
                         }`}
                       >
                         {b.payment_status}
