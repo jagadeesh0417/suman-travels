@@ -114,7 +114,7 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid sm:grid-cols-2 gap-4 mb-8">
         <Link
           href="/admin/dates"
           className="glass-card p-6 card-hover flex items-center gap-4"
@@ -175,6 +175,72 @@ export default function AdminDashboard() {
           </div>
         </Link>
       </div>
+
+      <div className="glass-card p-6 mb-4">
+        <h2 className="font-bold text-gray-900 mb-4">Payment Reconciliation</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Fix bookings that were paid via Razorpay but stuck as Pending in the database.
+          This checks each pending booking's Razorpay order and confirms it if payment was captured.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <ReconcileButton
+            label="Fix Stuck Bookings"
+            url="/api/admin/fix-stuck-bookings"
+            successMsg={({ repaired, scanned }) =>
+              `${repaired} repaired out of ${scanned} scanned`
+            }
+          />
+          <ReconcileButton
+            label="Sync Razorpay Orders"
+            url="/api/admin/reconcile"
+            successMsg={({ repaired, scanned }) =>
+              `${repaired} repaired, ${scanned} scanned`
+            }
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReconcileButton({
+  label,
+  url,
+  successMsg,
+}: {
+  label: string;
+  url: string;
+  successMsg: (data: any) => string;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleClick = async () => {
+    setLoading(true);
+    setResult(null);
+    setError(null);
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.detail || 'Request failed');
+      setResult(successMsg(data));
+      console.log(`[Reconcile] ${label}:`, data);
+    } catch (err: any) {
+      setError(err?.message || 'An error occurred');
+      console.error(`[Reconcile] ${label} error:`, err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <LoadingButton onClick={handleClick} loading={loading} loadingText="Processing..." variant="primary">
+        {label}
+      </LoadingButton>
+      {result && <p className="text-sm text-green-600 mt-2">{result}</p>}
+      {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
     </div>
   );
 }

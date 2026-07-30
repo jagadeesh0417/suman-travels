@@ -23,6 +23,14 @@ This version has breaking changes — APIs, conventions, and file structure may 
    - Admin booking detail: Shows BharatPe order ID, txn ID, payment timestamp
    - DB migration: `bharatpe_order_id`, `bharatpe_txn_id`, `payment_timestamp` columns in `bookings`
    - All commits pushed to GitHub; Vercel auto-deploys
+6. **Razorpay payment flow audit and fix** (complete end-to-end):
+   - **Root cause found**: `/api/bookings/[bookingId]/status` returned `paid_detected` without calling `confirmBooking()`. If the webhook (`RAZORPAY_WEBHOOK_SECRET` unset) and handler callback both didn't fire, the booking stayed `pending` forever despite successful payment.
+   - **Fix**: Status endpoint now fetches captured payment from Razorpay and actively calls `confirmBooking()` when `order.status === 'paid'`, then returns `confirmed` with serial number. The `paid_detected` fallback still exists but is rarely hit.
+   - **`confirmBooking()` retry**: Wrapped the outer transaction in 3 retry attempts with 500ms backoff for transient DB/network failures. Added structured logging with prefix markers (`✓`, `✗`, `+`).
+   - **New reconciliation API** (`/api/admin/fix-stuck-bookings`): Scans all `pending` bookings with `razorpay_order_id`, checks Razorpay order status, and confirms them if captured. Runs via admin dashboard buttons.
+   - **Admin dashboard reconciliation UI**: "Fix Stuck Bookings" and "Sync Razorpay Orders" buttons with loading/result/error states.
+   - **Full audit**: Traced every file in the Razorpay flow (`create-order`, `verify`, `webhook`, `status`, `recover`, `confirmBooking`). All status reference patterns consistent.
+   - **Previous fixes deployed** (commit `41104c2`): 10 files — webhook `payment.failed` handler, slot selection loading state, standardized API responses, admin status badges (green/red/gray/yellow/amber), cancel/dismiss redirect fix, proper `try/catch/finally`, comprehensive console.log across entire flow.
 
 ### Remaining (BharatPe)
 - Configure `BHARATPE_API_KEY`, `BHARATPE_API_SECRET`, `BHARATPE_MERCHANT_ID`, `BHARATPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_BASE_URL` in Vercel env vars

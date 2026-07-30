@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { dbExecute, rowToObject } from '@/lib/db';
-import { fetchOrderStatus } from '@/lib/razorpay';
+import { fetchOrderStatus, fetchOrderPayments, confirmBooking } from '@/lib/razorpay';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -28,7 +28,6 @@ export async function GET(
   }
 
   try {
-    // Fetch booking with tight projection
     const result = await dbExecute(
       'SELECT booking_id, payment_status, serial_number, receipt_token, amount FROM bookings WHERE booking_id = ?',
       [bookingId]
@@ -39,7 +38,7 @@ export async function GET(
       return NextResponse.json({ error: 'Not found' }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
     }
 
-    // Constant-time token comparison — prevent leaking booking existence
+    // Constant-time token comparison
     const storedToken = (booking.receipt_token as string) || '';
     if (!storedToken || !timingSafeEqual(token, storedToken)) {
       return NextResponse.json({ error: 'Not found' }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
@@ -93,8 +92,27 @@ export async function GET(
       try {
         const order = await fetchOrderStatus(razorpayOrderId);
         if (order.status === 'paid') {
-          // Payment detected but not yet confirmed — trigger confirm via status endpoint
-          console.log(`[Status] Order ${razorpayOrderId} is paid, confirming booking ${bookingId}`);
+          console.log(`[Status] Order ${razorpayOrderId} is paid, auto-confirming booking ${bookingId}`);
+          // Actively confirm the booking — don't just return paid_detected
+          try {
+            const payments = await fetchOrderPayments(razorpayOrderId);
+            const paidPayment = payments.find(p => p.status === 'captured') || payments[0];
+            if (paidPayment) {
+              const confirmResult = await confirmBooking(bookingId, razorpayOrderId, paidPayment.id);
+              if (confirmResult.success) {
+                console.log(`[Status] Auto-confirmed booking ${bookingId}, serial=${confirmResult.serial_number}`);
+                return NextResponse.json(
+                  { status: 'confirmed', booking_id: bookingId, serial_number: confirmResult.serial_number },
+                  { headers: { 'Cache-Control': 'no-store' } }
+                );
+              } else {
+                console.error(`[Status] Auto-confirm failed for ${bookingId}: ${confirmResult.error}`);
+              }
+            }
+          } catch (confirmErr: any) {
+            console.error(`[Status] Auto-confirm error for ${bookingId}:`, confirmErr?.message || confirmErr);
+          }
+          // Fallback: if confirm fails, still tell frontend to retry
           return NextResponse.json(
             { status: 'paid_detected', message: 'Payment detected, confirming...', booking_id: bookingId },
             { headers: { 'Cache-Control': 'no-store' } }
@@ -106,7 +124,6 @@ export async function GET(
         );
       } catch (err: any) {
         console.error(`[Status] fetchOrderStatus error for ${razorpayOrderId}:`, err?.message || err);
-        // Razorpay API error — keep polling
       }
     }
 
