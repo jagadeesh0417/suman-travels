@@ -433,6 +433,38 @@ async function ensureSchema(): Promise<void> {
   } catch {
   }
 
+  // Audit log table for manual admin actions
+  try {
+    await client.execute({
+      sql: `CREATE TABLE IF NOT EXISTS audit_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        booking_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        admin_email TEXT NOT NULL,
+        previous_payment_status TEXT DEFAULT '',
+        new_payment_status TEXT DEFAULT '',
+        previous_booking_status TEXT DEFAULT '',
+        new_booking_status TEXT DEFAULT '',
+        details TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+    });
+  } catch (err: any) {
+    console.error('[DB] Failed to create audit_log table:', err?.message || err);
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN confirmed_by TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN confirmation_type TEXT DEFAULT 'auto'" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN confirmed_at DATETIME DEFAULT NULL" });
+  } catch {
+  }
+
   const defaultSettings: Record<string, string> = {
     upi_id: '9848579053@paytm',
     upi_name: 'Suman Travels',

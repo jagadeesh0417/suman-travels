@@ -20,6 +20,9 @@ interface BookingRecord {
   passenger_count: number;
   amount: number;
   payment_status: string;
+  confirmed_by?: string;
+  confirmation_type?: string;
+  confirmed_at?: string;
   razorpay_payment_id?: string;
   razorpay_order_id?: string;
   razorpay_bank_ref?: string;
@@ -31,18 +34,39 @@ export default function AdminBookings() {
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const loadBookings = () => {
     const params = new URLSearchParams();
     if (search) params.set('search', search);
     if (statusFilter) params.set('status', statusFilter);
-
     fetch(`/api/bookings?${params.toString()}`)
       .then((r) => r.json())
       .then(setBookings);
   };
 
   useEffect(loadBookings, [search, statusFilter]);
+
+  const handleManualConfirm = async (bookingId: string) => {
+    setConfirmingId(bookingId);
+    setConfirmError(null);
+    try {
+      const res = await fetch('/api/admin/manual-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.detail || 'Confirmation failed');
+      loadBookings();
+    } catch (err: any) {
+      setConfirmError(err?.message || 'An error occurred');
+      console.error(`[Admin] Manual confirm error:`, err);
+    } finally {
+      setConfirmingId(null);
+    }
+  };
 
   return (
     <div>
@@ -70,6 +94,12 @@ export default function AdminBookings() {
           </select>
         </div>
       </div>
+
+      {confirmError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {confirmError}
+        </div>
+      )}
 
       <div className="glass-card overflow-hidden">
         <div className="overflow-x-auto">
@@ -105,6 +135,7 @@ export default function AdminBookings() {
               {bookings.map((b) => {
                 const name = b.customer_name_ext || b.customer_name || '';
                 const mobile = b.customer_mobile_ext || b.customer_mobile || '';
+                const isManuallyConfirmed = b.confirmation_type === 'manual' && b.payment_status === 'confirmed';
                 return (
                   <tr key={b.booking_id} className="border-t border-gray-50 hover:bg-gray-50/50 transition-colors">
                     <td className="p-3 whitespace-nowrap">
@@ -131,7 +162,9 @@ export default function AdminBookings() {
                       <span
                         className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                           b.payment_status === 'confirmed'
-                            ? 'bg-green-50 text-green-700'
+                            ? isManuallyConfirmed
+                              ? 'bg-blue-50 text-blue-700'
+                              : 'bg-green-50 text-green-700'
                             : b.payment_status === 'failed'
                             ? 'bg-red-50 text-red-700'
                             : b.payment_status === 'cancelled'
@@ -141,7 +174,7 @@ export default function AdminBookings() {
                             : 'bg-amber-50 text-amber-700'
                         }`}
                       >
-                        {b.payment_status}
+                        {isManuallyConfirmed ? 'Confirmed Manually' : b.payment_status}
                       </span>
                     </td>
                     <td className="p-3 whitespace-nowrap font-mono text-xs text-gray-500 max-w-[120px] truncate" title={b.razorpay_payment_id || ''}>
@@ -157,12 +190,23 @@ export default function AdminBookings() {
                       {formatShortTimestamp(b.created_at)}
                     </td>
                     <td className="p-3 text-right whitespace-nowrap">
-                      <Link
-                        href={`/admin/bookings/${b.booking_id}`}
-                        className="px-3 py-1.5 bg-[#1e3a5f]/5 text-[#1e3a5f] rounded-lg text-sm font-medium hover:bg-[#1e3a5f]/10 transition-colors"
-                      >
-                        View
-                      </Link>
+                      <div className="flex items-center justify-end gap-2">
+                        <Link
+                          href={`/admin/bookings/${b.booking_id}`}
+                          className="px-3 py-1.5 bg-[#1e3a5f]/5 text-[#1e3a5f] rounded-lg text-sm font-medium hover:bg-[#1e3a5f]/10 transition-colors"
+                        >
+                          View
+                        </Link>
+                        {b.payment_status === 'pending' && (
+                          <button
+                            onClick={() => handleManualConfirm(b.booking_id)}
+                            disabled={confirmingId === b.booking_id}
+                            className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                          >
+                            {confirmingId === b.booking_id ? '...' : 'Confirm'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

@@ -32,6 +32,9 @@ interface BookingDetail {
   customer_name?: string;
   customer_mobile?: string;
   customer_email?: string;
+  confirmed_by?: string;
+  confirmation_type?: string;
+  confirmed_at?: string;
   created_at: string;
   passengers: Passenger[];
 }
@@ -44,9 +47,15 @@ export default function BookingDetailPage({
   const { bookingId } = use(params);
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [confirmSuccess, setConfirmSuccess] = useState<string | null>(null);
 
   const loadBooking = useCallback(() => {
     setRefreshing(true);
+    setConfirmSuccess(null);
+    setConfirmError(null);
     fetch(`/api/bookings/${bookingId}`)
       .then((r) => r.json())
       .then(setBooking)
@@ -55,6 +64,27 @@ export default function BookingDetailPage({
 
   useEffect(loadBooking, [loadBooking]);
 
+  const handleManualConfirm = async () => {
+    setConfirming(true);
+    setConfirmError(null);
+    try {
+      const res = await fetch('/api/admin/manual-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.detail || 'Confirmation failed');
+      setConfirmSuccess(`Booking confirmed! Serial No: ${data.serial_number}`);
+      setShowConfirmModal(false);
+      loadBooking();
+    } catch (err: any) {
+      setConfirmError(err?.message || 'An error occurred');
+    } finally {
+      setConfirming(false);
+    }
+  };
+
   if (!booking) {
     return (
       <div className="text-center py-20">
@@ -62,6 +92,9 @@ export default function BookingDetailPage({
       </div>
     );
   }
+
+  const isPending = booking.payment_status === 'pending';
+  const isManuallyConfirmed = booking.confirmation_type === 'manual' && booking.payment_status === 'confirmed';
 
   return (
     <div>
@@ -86,6 +119,18 @@ export default function BookingDetailPage({
         </LoadingButton>
       </div>
 
+      {confirmError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {confirmError}
+        </div>
+      )}
+
+      {confirmSuccess && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">
+          {confirmSuccess}
+        </div>
+      )}
+
       <div className="grid md:grid-cols-2 gap-6 mb-6">
         <div className="glass-card p-6">
           <h2 className="font-bold text-gray-900 mb-4">Booking Information</h2>
@@ -105,7 +150,9 @@ export default function BookingDetailPage({
               <span
                 className={`px-3 py-0.5 rounded-full text-xs font-semibold ${
                   booking.payment_status === 'confirmed'
-                    ? 'bg-green-50 text-green-700'
+                    ? isManuallyConfirmed
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'bg-green-50 text-green-700'
                     : booking.payment_status === 'failed'
                     ? 'bg-red-50 text-red-700'
                     : booking.payment_status === 'cancelled'
@@ -115,9 +162,27 @@ export default function BookingDetailPage({
                     : 'bg-amber-50 text-amber-700'
                 }`}
               >
-                {booking.payment_status}
+                {isManuallyConfirmed ? 'Confirmed Manually' : booking.payment_status}
               </span>
             </div>
+            {booking.confirmed_by && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Confirmed By</span>
+                <span className="font-mono text-sm text-gray-600">{booking.confirmed_by}</span>
+              </div>
+            )}
+            {booking.confirmation_type && booking.payment_status === 'confirmed' && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Confirmation Type</span>
+                <span className="text-sm text-gray-600 capitalize">{booking.confirmation_type}</span>
+              </div>
+            )}
+            {booking.confirmed_at && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Confirmed At</span>
+                <span className="text-sm text-gray-600">{formatTimestamp(booking.confirmed_at)}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-gray-500">Travel Date</span>
               <span className="font-medium">{booking.date}</span>
@@ -244,6 +309,58 @@ export default function BookingDetailPage({
           </div>
         </div>
       </div>
+
+      {isPending && (
+        <div className="glass-card p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-gray-900">Manual Confirmation</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Use this only if you have verified the payment offline and the booking is stuck as Pending.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowConfirmModal(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              Confirm Booking
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-md mx-4">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Confirm Booking</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Are you sure you want to manually confirm this booking? Use this only if you have already verified the payment offline.
+            </p>
+            {confirmError && (
+              <p className="text-sm text-red-600 mb-4 bg-red-50 p-2 rounded">{confirmError}</p>
+            )}
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => { setShowConfirmModal(false); setConfirmError(null); }}
+                disabled={confirming}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <LoadingButton
+                onClick={handleManualConfirm}
+                loading={confirming}
+                loadingText="Confirming..."
+                variant="primary"
+                className="px-4 py-2"
+              >
+                Confirm
+              </LoadingButton>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Link href="/admin/bookings" className="btn-outline inline-flex">
         Back to Bookings
