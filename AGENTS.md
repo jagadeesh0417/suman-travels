@@ -31,6 +31,12 @@ This version has breaking changes — APIs, conventions, and file structure may 
    - **Admin dashboard reconciliation UI**: "Fix Stuck Bookings" and "Sync Razorpay Orders" buttons with loading/result/error states.
    - **Full audit**: Traced every file in the Razorpay flow (`create-order`, `verify`, `webhook`, `status`, `recover`, `confirmBooking`). All status reference patterns consistent.
    - **Previous fixes deployed** (commit `41104c2`): 10 files — webhook `payment.failed` handler, slot selection loading state, standardized API responses, admin status badges (green/red/gray/yellow/amber), cancel/dismiss redirect fix, proper `try/catch/finally`, comprehensive console.log across entire flow.
+7. **Manual booking confirmation for admin** (backup when payment is stuck pending):
+   - New `POST /api/admin/manual-confirm` — admin-only, validates slot exists, assigns serial number, inserts audit log, all in a transaction
+   - New `audit_log` table and `confirmed_by`/`confirmation_type`/`confirmed_at` columns in `bookings`
+   - Admin booking list: "Confirm" button for pending bookings, shows "Confirmed Manually" badge (blue)
+   - Admin booking detail: "Confirm Booking" card with modal dialog ("Are you sure...")
+   - Existing auto-confirmation via Razorpay/webhook remains completely untouched
 
 ### Remaining (BharatPe)
 - Configure `BHARATPE_API_KEY`, `BHARATPE_API_SECRET`, `BHARATPE_MERCHANT_ID`, `BHARATPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_BASE_URL` in Vercel env vars
