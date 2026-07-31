@@ -83,7 +83,18 @@ export type ResultSet = {
   columns: string[];
   rows: any[];
   lastInsertRowid?: number | null;
+  rowsAffected?: number;
 };
+
+export function isDatabaseLockedError(err: any): boolean {
+  const msg = String(err?.message || '').toLowerCase();
+  return (
+    msg.includes('database is locked') ||
+    msg.includes('database is busy') ||
+    msg.includes('sqlite_busy') ||
+    msg.includes('locking failed')
+  );
+}
 
 class DirectTursoClient {
   private url: string;
@@ -119,11 +130,12 @@ class DirectTursoClient {
       columns,
       rows,
       lastInsertRowid: r.last_insert_rowid != null ? Number(r.last_insert_rowid) : undefined,
+      rowsAffected: r.affected_row_count != null ? Number(r.affected_row_count) : undefined,
     };
   }
 
   async transaction(_mode: string): Promise<DirectTursoTransaction> {
-    return new DirectTursoTransaction(this);
+    return new DirectTursoTransaction(this, _mode);
   }
 
   close() {}
@@ -156,15 +168,20 @@ class DirectTursoTransaction {
   private baton: string | null | undefined;
   private _opened = false;
   private _closed = false;
+  private _mode: string;
 
-  constructor(client: DirectTursoClient) {
+  constructor(client: DirectTursoClient, mode: string) {
     this.client = client;
+    this._mode = mode;
   }
 
   async execute({ sql, args }: { sql: string; args?: (string | number)[] }): Promise<ResultSet> {
     if (!this._opened) {
+      // Write transactions must use BEGIN IMMEDIATE so the write lock is
+      // acquired up front (avoids deferred-transaction upgrade deadlocks).
+      const beginSql = this._mode === 'write' ? 'BEGIN IMMEDIATE' : 'BEGIN';
       const resp = await this.client._pipeline([
-        { type: 'execute', stmt: { sql: 'BEGIN', args: [], named_args: [], want_rows: false } },
+        { type: 'execute', stmt: { sql: beginSql, args: [], named_args: [], want_rows: false } },
       ]);
       this.baton = resp.baton;
       this._opened = true;
@@ -193,6 +210,7 @@ class DirectTursoTransaction {
       columns: txnCols,
       rows: txnRows,
       lastInsertRowid: r.last_insert_rowid != null ? Number(r.last_insert_rowid) : undefined,
+      rowsAffected: r.affected_row_count != null ? Number(r.affected_row_count) : undefined,
     };
   }
 
@@ -490,6 +508,17 @@ async function ensureSchema(): Promise<void> {
   console.log('[DB] Schema ready.');
 }
 
+// Best-effort: make SQLite wait for a lock instead of failing instantly.
+// Only meaningful for the local file backend; Turso ignores/errors harmlessly.
+export async function applyConnectionSettings(): Promise<void> {
+  try {
+    if (client) {
+      await client.execute({ sql: 'PRAGMA busy_timeout = 5000' });
+    }
+  } catch {
+  }
+}
+
 export async function getDb(): Promise<Client> {
   if (!client) {
     if (isTurso) {
@@ -508,6 +537,7 @@ export async function getDb(): Promise<Client> {
     });
   }
   await initPromise;
+  await applyConnectionSettings();
   return client;
 }
 
